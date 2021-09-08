@@ -1,17 +1,41 @@
 #include <iostream>
+#include <SFML/Window.hpp>
+#include <SFML/OpenGL.hpp>
 
 int main()
 {
-    std::cout << "Hello World!\n";
+	sf::ContextSettings settings;
+	settings.depthBits = 24;
+	settings.stencilBits = 8;
+	settings.antialiasingLevel = 2;
+	
+	sf::Window window(sf::VideoMode(800, 600), "TGLE", sf::Style::Close, settings);
+	window.setVerticalSyncEnabled(true);
+	window.setActive(true);
+	bool running = true;
+	while (running)
+	{
+		sf::Event event;
+		while (window.pollEvent(event))
+		{
+			switch (event.type)
+			{
+			case sf::Event::Closed:
+				running = false;
+				break;
+
+			case sf::Event::Resized:
+				glViewport(0, 0, event.size.width, event.size.height);
+				break;
+			}
+		}
+
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		//Draw
+
+		window.display();
+	}
+
+	return 0;
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file

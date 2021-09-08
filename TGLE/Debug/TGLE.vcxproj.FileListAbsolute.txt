@@ -1,0 +1,4 @@
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\TGLE.exe
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\TGLE.vcxproj.CopyComplete
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\sfml-system-d-2.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\sfml-window-d-2.dll
