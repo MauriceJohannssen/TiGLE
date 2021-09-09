@@ -1,5 +1,7 @@
 #include "glad/glad.h"
 #include <SFML/Window.hpp>
+#include <iostream>
+#include "Input.h"
 
 int main()
 {
@@ -10,30 +12,26 @@ int main()
 	settings.majorVersion = 3;
 	settings.minorVersion = 3;
 
-	sf::Window window(sf::VideoMode(800, 600), "TGLE", sf::Style::Default, settings);
+	sf::Window window(sf::VideoMode(1600, 900), "TGLE", sf::Style::Default, settings);
 	window.setVerticalSyncEnabled(true);
 	window.setActive(true);
-	bool running = true;
-	while (running)
-	{
-		sf::Event event;
-		while (window.pollEvent(event))
-		{
-			switch (event.type)
-			{
-			case sf::Event::Closed:
-				running = false;
-				break;
 
-			case sf::Event::Resized:
-				glViewport(0, 0, event.size.width, event.size.height);
-				break;
-			}
-		}
+	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(sf::Context::getFunction)))
+	{
+		std::cout << "Could not initialize GLAD";
+	}
+
+	glViewport(0, 0, 1600, 900);
+	while (window.isOpen())
+	{
+		HandleInput(&window);
+
 		//Draw
 
 		window.display();
 	}
+
+	window.close();
 
 	return 0;
 }
