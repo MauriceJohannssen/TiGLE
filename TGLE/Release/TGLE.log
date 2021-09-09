@@ -1,3 +1,0 @@
-﻿TGLE.obj : error LNK2001: unresolved external symbol __imp__glViewport@16
-TGLE.obj : error LNK2001: unresolved external symbol __imp__glClear@4
-C:\Users\Mauri\Repositories\DirectX12\TGLE\Release\TGLE.exe : fatal error LNK1120: 2 unresolved externals
