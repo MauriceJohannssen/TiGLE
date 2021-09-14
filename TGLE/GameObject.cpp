@@ -17,7 +17,7 @@ GameObject::GameObject(const std::string& name) : name(name)
 
 GameObject::GameObject(const std::string& pName, const Material &pMaterial) : name(pName), material(pMaterial)
 {
-	objectSpace = glm::mat4(1);
+	objectSpace = glm::rotate(glm::mat4(1), glm::radians(-60.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
 void GameObject::Translate(const glm::vec3 pDirection)
