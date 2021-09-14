@@ -4,6 +4,7 @@ class Material
 {
 public:
 	Material(const char* texturePath);
+	Material(const Material &pMaterial);
 	Material();
 	int GetTextureID() const;
 	void Use() const;

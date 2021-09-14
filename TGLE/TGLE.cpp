@@ -6,6 +6,7 @@
 #include "Input.h"
 #include "Material.h"
 #include "Shader.h"
+#include "GameObject.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -75,10 +76,7 @@ int main()
 	Material newMaterial("Pepe.jpg");
 	newMaterial.Use();
 
-	glm::vec4 vec(1, 0, 0, 1);
-	glm::mat4 translation = glm::mat4(1.0f);
-	translation = glm::translate(translation, glm::vec3(1.0f, 1.0f, 0.0f));
-	vec = translation * vec;
+	GameObject gameObject("TestGameObject", newMaterial);
 
 	unsigned int transformMatrixID = glGetUniformLocation(shaderProgram.ID, "transform");
 	sf::Clock clock;
@@ -90,14 +88,10 @@ int main()
 		
 		HandleInput(&window);
 
-		//Copy constructor called
-		glm::mat4 rotationScaling = glm::mat4(1.0f);
-		rotationScaling = glm::rotate(rotationScaling, clock.getElapsedTime().asSeconds(), glm::vec3(0, 0, 1.0f));
-		rotationScaling = glm::scale(rotationScaling, glm::vec3(0.5f, 0.5f, 0.5f));
-		glUniformMatrix4fv(transformMatrixID, 1, GL_FALSE, glm::value_ptr(rotationScaling));
+		glUniformMatrix4fv(transformMatrixID, 1, GL_FALSE, glm::value_ptr(gameObject.GetObjectMatrix()));
 
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, 8, GL_UNSIGNED_INT, 0);
 
 		window.display();
 	}
