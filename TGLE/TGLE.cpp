@@ -80,9 +80,8 @@ int main()
 	translation = glm::translate(translation, glm::vec3(1.0f, 1.0f, 0.0f));
 	vec = translation * vec;
 
-	//Copy constructor called
-	glm::mat4 rotationScaling = glm::mat4(1.0f);
-	
+	unsigned int transformMatrixID = glGetUniformLocation(shaderProgram.ID, "transform");
+	sf::Clock clock;
 
 	while (window.isOpen())
 	{
@@ -90,6 +89,12 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
 		HandleInput(&window);
+
+		//Copy constructor called
+		glm::mat4 rotationScaling = glm::mat4(1.0f);
+		rotationScaling = glm::rotate(rotationScaling, clock.getElapsedTime().asSeconds(), glm::vec3(0, 0, 1.0f));
+		rotationScaling = glm::scale(rotationScaling, glm::vec3(0.5f, 0.5f, 0.5f));
+		glUniformMatrix4fv(transformMatrixID, 1, GL_FALSE, glm::value_ptr(rotationScaling));
 
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
