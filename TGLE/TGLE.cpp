@@ -6,6 +6,9 @@
 #include "Input.h"
 #include "Material.h"
 #include "Shader.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 void DebugInformation();
 
@@ -71,6 +74,15 @@ int main()
 
 	Material newMaterial("Pepe.jpg");
 	newMaterial.Use();
+
+	glm::vec4 vec(1, 0, 0, 1);
+	glm::mat4 translation = glm::mat4(1.0f);
+	translation = glm::translate(translation, glm::vec3(1.0f, 1.0f, 0.0f));
+	vec = translation * vec;
+
+	//Copy constructor called
+	glm::mat4 rotationScaling = glm::mat4(1.0f);
+	
 
 	while (window.isOpen())
 	{
