@@ -13,6 +13,7 @@ GameObject::GameObject()
 
 GameObject::GameObject(const std::string& name) : name(name)
 {
+	objectSpace = glm::mat4(1);
 }
 
 GameObject::GameObject(const std::string& pName, const Material &pMaterial) : name(pName), material(pMaterial)

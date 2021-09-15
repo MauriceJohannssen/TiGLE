@@ -1,4 +1,5 @@
 #pragma once
 #include <SFML/Window.hpp>
+#include "Camera.h"
 
-void HandleInput(sf::Window *window);
+void HandleInput(sf::Window* pWindow, Camera *pCamera);

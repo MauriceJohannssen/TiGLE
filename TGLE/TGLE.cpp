@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "Camera.h"
 
 void DebugInformation();
 
@@ -35,6 +36,8 @@ int main()
 	DebugInformation();
 
 	glViewport(0, 0, 1600, 900);
+
+	Camera mainCamera;
 
 	float vertices[] = {
 		-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
@@ -133,7 +136,7 @@ int main()
 	glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);
 	
 	glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
-
+	mainCamera.SetPosition(glm::vec3(0, 0, -3));
 
 
 
@@ -159,9 +162,9 @@ int main()
 		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
-		HandleInput(&window);
+		HandleInput(&window, &mainCamera);
 
-		view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, cameraUp);
+		view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), cameraUp);
 		
 		glm::mat4 MVPMatrix = projection * view * gameObject.GetObjectMatrix();
 		
