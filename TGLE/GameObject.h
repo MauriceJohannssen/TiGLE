@@ -21,7 +21,7 @@ public:
 	void SetPosition(const glm::vec3 pPosition);
 	void SetForward(const glm::vec3 pForward);
 
-	void Render(const glm::mat4 viewMatrix, const glm::mat4 projectionMatrix, const Shader shaderProgram) const;
+	unsigned int GetVAO() const;
 
 private:
 	std::string name;

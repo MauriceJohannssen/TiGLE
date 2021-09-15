@@ -139,13 +139,10 @@ void GameObject::SetupGL()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void GameObject::Render(const glm::mat4 viewMatrix, const glm::mat4 projectionMatrix, const Shader shaderProgram) const
+
+unsigned GameObject::GetVAO() const
 {
-	glBindVertexArray(VAO);
-	glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * objectSpace;
-	glUniformMatrix4fv(glGetUniformLocation(shaderProgram.ID, "transform"), 1, GL_FALSE, glm::value_ptr(MVPMatrix));
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-	glBindVertexArray(0);
+	return VAO;
 }
+
 

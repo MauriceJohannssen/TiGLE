@@ -11,9 +11,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "Camera.h"
+#include <vector>
 
 void DebugInformation();
-
+void Render(const std::vector<GameObject> pGameObjects, const glm::mat4 viewMatrix, const glm::mat4 projectionMatrix, const Shader shaderProgram);
 
 int main()
 {
@@ -45,8 +46,14 @@ int main()
 	Material newMaterial("Pepe.jpg");
 	newMaterial.Use();
 
+	std::vector<GameObject> gameObjects;
+
 	GameObject gameObject("TestGameObject", newMaterial);
-	GameObject gameObject1("GO2");
+	GameObject gameObject1("GO2", newMaterial);
+	gameObject1.SetPosition(glm::vec3(2, 1, 4));
+
+	gameObjects.push_back(gameObject);
+	gameObjects.push_back(gameObject1);
 
 	//Time
 	sf::Clock clock;
@@ -73,10 +80,7 @@ int main()
 
 		//Update MVP Matrix
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
-
-		//Render Objects
-		gameObject.Render(view, mainCamera.GetProjectionMatrix(), shaderProgram);
-	
+		Render(gameObjects, view, mainCamera.GetProjectionMatrix(), shaderProgram);
 		//Swap Buffers
 		window.display();
 	}
@@ -84,6 +88,20 @@ int main()
 	window.close();
 
 	return 0;
+}
+
+void Render(const std::vector<GameObject> pGameObjects, const glm::mat4 viewMatrix, const glm::mat4 projectionMatrix, const Shader shaderProgram)
+{
+	for (GameObject element : pGameObjects)
+	{
+		glBindVertexArray(element.GetVAO());
+		glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * element.GetObjectMatrix();
+		glUniformMatrix4fv(glGetUniformLocation(shaderProgram.ID, "transform"), 1, GL_FALSE, glm::value_ptr(MVPMatrix));
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		//Todo: Get vertex count here!
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glBindVertexArray(0);
+	}
 }
 
 //This is supposed to print all sorts of general debug information.
