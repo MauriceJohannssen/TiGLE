@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-void HandleInput(sf::Window* pWindow, Camera *pCamera)
+void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
 {
 	sf::Event event;
 	while(pWindow->pollEvent(event))
@@ -35,7 +35,7 @@ void HandleInput(sf::Window* pWindow, Camera *pCamera)
 				break;
 			}
 			
-			pCamera->Translate(movementVector * 0.1f);
+			pCamera->Translate(movementVector * 5.0f * pDeltaTime);
 			break;
 		}
 	}

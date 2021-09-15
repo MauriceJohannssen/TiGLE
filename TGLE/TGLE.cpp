@@ -25,7 +25,7 @@ int main()
 	settings.minorVersion = 3;
 
 	sf::Window window(sf::VideoMode(1600, 900), "TGLE", sf::Style::Default, settings);
-	window.setVerticalSyncEnabled(false);
+	window.setVerticalSyncEnabled(true);
 	window.setActive(true);
 
 	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(sf::Context::getFunction)))
@@ -36,8 +36,6 @@ int main()
 	DebugInformation();
 
 	glViewport(0, 0, 1600, 900);
-
-	Camera mainCamera;
 
 	float vertices[] = {
 		-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
@@ -126,53 +124,40 @@ int main()
 	GameObject gameObject("TestGameObject", newMaterial);
 
 	unsigned int transformMatrixID = glGetUniformLocation(shaderProgram.ID, "transform");
-	
+
+	//Time
 	sf::Clock clock;
+	float deltaTime = 0.0f;
+	float lastFrame = 0.0f;
 
-	//View
-	glm::vec3 cameraPosition(0, 0, 3);
-	glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f);
-	glm::vec3 cameraRight(1.0f, 0.0f, 0.0f);
-	glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);
-	
-	glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
+	//Camera
+	Camera mainCamera(ProjectionType::Perspective);
 	mainCamera.SetPosition(glm::vec3(0, 0, -3));
-
-
-
-
-
-
-
-
-
-
-
-
-
-	
-	
-	//Projection
-	glm::mat4 projection = glm::perspective(glm::radians(50.0f), 1600.0f / 800.0f, 0.1f, 100.0f);
-
-	glm::mat4 rotMat = glm::mat4(1);
 
 	while (window.isOpen())
 	{
+		//Buffer Clearing
 		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
-		HandleInput(&window, &mainCamera);
 
-		view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), cameraUp);
-		
-		glm::mat4 MVPMatrix = projection * view * gameObject.GetObjectMatrix();
-		
+		//Update Time
+		deltaTime = clock.getElapsedTime().asSeconds() - lastFrame;
+		lastFrame = clock.getElapsedTime().asSeconds();
+		std::cout << "Delta time was " << deltaTime << std::endl;
+
+		//Input
+		HandleInput(&window, &mainCamera, deltaTime);
+
+		//Update MVP Matrix
+		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
+		glm::mat4 MVPMatrix = mainCamera.GetProjectionMatrix() * view * gameObject.GetObjectMatrix();
 		glUniformMatrix4fv(transformMatrixID, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
 
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		//Render Objects
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 
+		//Swap Buffers
 		window.display();
 	}
 
@@ -181,6 +166,7 @@ int main()
 	return 0;
 }
 
+//This is supposed to print all sorts of general debug information.
 void DebugInformation()
 {
 	int nrAttributes;
