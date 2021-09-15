@@ -29,7 +29,7 @@ int main()
 
 	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(sf::Context::getFunction)))
 	{
-		std::cout << "Could not initialize GLAD";
+		std::cout << "Error: Could not initialize GLAD";
 	}
 
 	DebugInformation();
@@ -127,7 +127,27 @@ int main()
 	sf::Clock clock;
 
 	//View
+	glm::vec3 cameraPosition(0, 0, 3);
+	glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f);
+	glm::vec3 cameraRight(1.0f, 0.0f, 0.0f);
+	glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);
+	
 	glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
 	
 	//Projection
 	glm::mat4 projection = glm::perspective(glm::radians(50.0f), 1600.0f / 800.0f, 0.1f, 100.0f);
@@ -141,8 +161,9 @@ int main()
 		
 		HandleInput(&window);
 
-		rotMat = glm::rotate(glm::mat4(1), clock.getElapsedTime().asSeconds() * glm::radians(50.0f), glm::vec3(0.4f, 1.0f, 0.0f));
-		glm::mat4 MVPMatrix = projection * view * rotMat;
+		view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, cameraUp);
+		
+		glm::mat4 MVPMatrix = projection * view * gameObject.GetObjectMatrix();
 		
 		glUniformMatrix4fv(transformMatrixID, 1, GL_FALSE, glm::value_ptr(MVPMatrix));
 
