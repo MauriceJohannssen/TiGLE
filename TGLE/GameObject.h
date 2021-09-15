@@ -2,6 +2,7 @@
 #include <string>
 #include <glm/gtc/matrix_transform.hpp>
 #include "Material.h"
+#include "Shader.h"
 
 class GameObject
 {
@@ -20,8 +21,14 @@ public:
 	void SetPosition(const glm::vec3 pPosition);
 	void SetForward(const glm::vec3 pForward);
 
+	void Render(const glm::mat4 viewMatrix, const glm::mat4 projectionMatrix, const Shader shaderProgram) const;
+
 private:
 	std::string name;
 	Material material;
 	glm::mat4 objectSpace;
+	unsigned int VAO;
+	unsigned int VBO;
+
+	void SetupGL();
 };
