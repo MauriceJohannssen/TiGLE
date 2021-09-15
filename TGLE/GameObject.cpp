@@ -44,3 +44,8 @@ glm::mat4 GameObject::GetObjectMatrix() const
 	return objectSpace;
 }
 
+glm::vec3 GameObject::GetForward()
+{
+	return objectSpace[2];
+}
+

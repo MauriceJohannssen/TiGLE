@@ -12,15 +12,6 @@ Camera::Camera(ProjectionType pProjection) : GameObject("Camera")
 	}
 }
 
-glm::vec3 Camera::GetForward()
-{
-	return GetObjectMatrix()[2];
-}
-
-void Camera::SetForward(const glm::vec3 pForwardVector)
-{
-	objectSpace[2] = glm::vec4(pForwardVector, 0);
-}
 
 glm::vec3 Camera::GetUp()
 {
