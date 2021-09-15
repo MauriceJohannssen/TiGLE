@@ -132,7 +132,8 @@ int main()
 
 	//Camera
 	Camera mainCamera(ProjectionType::Perspective);
-	mainCamera.SetPosition(glm::vec3(0, 0, -3));
+	mainCamera.SetPosition(glm::vec3(0, 0, 3));
+	mainCamera.SetForward(glm::vec3(0, 0, -1));
 
 	while (window.isOpen())
 	{
@@ -143,7 +144,6 @@ int main()
 		//Update Time
 		deltaTime = clock.getElapsedTime().asSeconds() - lastFrame;
 		lastFrame = clock.getElapsedTime().asSeconds();
-		std::cout << "Delta time was " << deltaTime << std::endl;
 
 		//Input
 		HandleInput(&window, &mainCamera, deltaTime);
