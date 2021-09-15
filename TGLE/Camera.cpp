@@ -13,21 +13,6 @@ Camera::Camera(ProjectionType pProjection) : GameObject("Camera")
 }
 
 
-glm::vec3 Camera::GetUp()
-{
-	return GetObjectMatrix()[1];
-}
-
-glm::vec3 Camera::GetPosition()
-{
-	glm::vec4 test = GetObjectMatrix()[3];
-	glm::vec3 newTest;
-	newTest.x = test.x;
-	newTest.y = test.y;
-	newTest.z = test.z;
-	return newTest;
-}
-
 glm::mat4 Camera::GetProjectionMatrix() const
 {
 	return projectionMatrix;

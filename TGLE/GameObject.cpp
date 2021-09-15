@@ -49,3 +49,12 @@ glm::vec3 GameObject::GetForward()
 	return objectSpace[2];
 }
 
+glm::vec3 GameObject::GetUp()
+{
+	return objectSpace[1];
+}
+
+glm::vec3 GameObject::GetPosition()
+{
+	return objectSpace[3];
+}

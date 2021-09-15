@@ -11,8 +11,6 @@ class Camera : public GameObject
 {
 public:
 	Camera(ProjectionType pProjection);
-	glm::vec3 GetUp();
-	glm::vec3 GetPosition();
 	glm::mat4 GetProjectionMatrix() const;
 private:
 	glm::mat4 projectionMatrix;
