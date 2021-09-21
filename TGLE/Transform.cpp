@@ -16,7 +16,7 @@ Transform::Transform(std::string& pName) : name(pName)
 	objectSpace = glm::mat4(1);
 }
 
-glm::vec3 Transform::GetPosition()
+glm::vec3 Transform::GetPosition() const
 {
 	return objectSpace[3];
 }
@@ -33,7 +33,7 @@ void Transform::Translate(const glm::vec3 pDirection)
 	objectSpace[3] += glm::vec4(pDirection, 0);
 }
 
-glm::vec3 Transform::GetForward()
+glm::vec3 Transform::GetForward() const
 {
 	return objectSpace[2];
 }
@@ -43,7 +43,7 @@ void Transform::SetForward(const glm::vec3 pForward)
 	objectSpace[2] = glm::vec4(pForward, 0);
 }
 
-glm::vec3 Transform::GetUp()
+glm::vec3 Transform::GetUp() const
 {
 	return objectSpace[1];
 }

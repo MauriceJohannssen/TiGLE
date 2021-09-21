@@ -9,7 +9,7 @@ class GameObject : public Transform
 {
 public:
 	GameObject();
-	GameObject(std::string pName, Material* pMaterial);
+	GameObject(std::string pName, Material* pMaterial= nullptr);
 
 	unsigned int GetVAO() const;
 	Material GetMaterial() const;

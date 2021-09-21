@@ -36,6 +36,9 @@
     <ClCompile Include="Transform.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Light.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Input.h">
@@ -56,6 +59,9 @@
     <ClInclude Include="Transform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Light.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="vertexShader.vert">
@@ -65,6 +71,9 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="colorShader.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="lightShader.frag">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

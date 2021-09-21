@@ -47,20 +47,19 @@ void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
 			break;
 
 		case sf::Event::MouseMoved:
-
-			const sf::Vector2i currentPosition = sf::Mouse::getPosition(*pWindow);
+			
+			sf::Vector2i center(pWindow->getSize().x / 2, pWindow->getSize().y / 2);
+			const sf::Vector2i currentPosition = sf::Mouse::getPosition(*pWindow) - center;
 
 			if(firstMouseMovement)
 			{
-				lastMouseX = currentPosition.x;
-				lastMouseY = currentPosition.y;
 				firstMouseMovement = false;
+				sf::Mouse::setPosition(center, *pWindow);
 			}
 
-			float mouseOffsetX = currentPosition.x - lastMouseX;
-			float mouseOffsetY = lastMouseY - currentPosition.y;
-			lastMouseX = currentPosition.x;
-			lastMouseY = currentPosition.y;
+			sf::Mouse::setPosition(center, *pWindow);
+			float mouseOffsetX = currentPosition.x;
+			float mouseOffsetY = -currentPosition.y;
 
 			float sensitivity = 15.0f;
 			mouseOffsetX *= sensitivity;

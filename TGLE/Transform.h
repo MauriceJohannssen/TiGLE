@@ -10,15 +10,15 @@ public:
 	Transform(std::string& pName);
 
 	//Transform related methods
-	glm::vec3 GetPosition();
+	glm::vec3 GetPosition() const;
 	void SetPosition(const glm::vec3 pPosition);
 
 	void Translate(const glm::vec3 pDirection);
 	
-	glm::vec3 GetForward();
+	glm::vec3 GetForward() const;
 	void SetForward(const glm::vec3 pForward);
 	
-	glm::vec3 GetUp();
+	glm::vec3 GetUp() const;
 
 	void Scale(glm::vec3 pScale);
 	

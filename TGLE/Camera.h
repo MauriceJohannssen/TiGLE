@@ -1,5 +1,5 @@
 #pragma once
-#include "GameObject.h"
+#include "Transform.h"
 
 enum ProjectionType
 {
@@ -7,7 +7,7 @@ enum ProjectionType
 	Perspective
 };
 
-class Camera : public GameObject
+class Camera : public Transform
 {
 public:
 	Camera(ProjectionType pProjection);
