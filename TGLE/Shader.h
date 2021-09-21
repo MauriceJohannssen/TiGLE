@@ -8,7 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
-#include <glm/vec3.hpp>
+#include <glm/fwd.hpp>
 
 class Shader
 {
@@ -20,6 +20,7 @@ public:
 	void SetInt(const std::string &name, int value) const;
 	void SetFloat(const std::string &name, float value) const;
 	void SetVec3(const std::string& name, glm::vec3 value) const;
+	void SetMat4(const std::string& name, glm::mat4 value) const;
 };
 
 #endif
