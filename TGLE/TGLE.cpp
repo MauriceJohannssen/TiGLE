@@ -147,8 +147,14 @@ void Render(Camera& camera, const std::vector<GameObject>& pGameObjects, const s
 
 		shader.SetMat4("transform", MVPMatrix);
 		shader.SetMat4("objectMatrix", *gameObject.GetObjectMatrix()); //Temporary
-		shader.SetVec3("objectColor", gameObject.GetMaterial().GetColor());
 
+		//Object
+		Material material = gameObject.GetMaterial();
+		shader.SetVec3("material.ambient", material.GetColor());
+		shader.SetVec3("material.diffuse", material.GetColor());
+		shader.SetVec3("material.specular", material.GetColor());
+		shader.SetFloat("material.shininess",  material.GetShininess());
+		
 		//Load in all lights here
 		colorShader.SetVec3("lightPosition", pLights.at(0).GetPosition());
 		colorShader.SetVec3("lightColor", pLights.at(0).GetLightColor());

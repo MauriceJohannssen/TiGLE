@@ -48,7 +48,10 @@ Material::Material(const glm::vec3 pColor)
 	width = 0;
 	height = 0;
 	numberChannels = 0;
-	color = pColor;
+	ambient = pColor;
+	diffuse = ambient;
+	specular = ambient;
+	shininess = 32;
 }
 
 Material::Material(const Material &pMaterial)
@@ -57,7 +60,7 @@ Material::Material(const Material &pMaterial)
 	width = pMaterial.width;
 	height = pMaterial.height;
 	numberChannels = pMaterial.numberChannels;
-	color = pMaterial.GetColor();
+	ambient = pMaterial.GetColor();
 }
 
 
@@ -73,8 +76,24 @@ void Material::Use() const
 
 glm::vec3 Material::GetColor() const
 {
-	return color;
+	return ambient;
 }
+
+glm::vec3 Material::GetDiffuse() const
+{
+	return diffuse;
+}
+
+glm::vec3 Material::GetSpecular() const
+{
+	return specular;
+}
+
+float Material::GetShininess() const
+{
+	return shininess;
+}
+
 
 bool Material::HasTexture() const
 {
