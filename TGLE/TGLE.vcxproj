@@ -143,6 +143,7 @@
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="Material.cpp" />
+    <ClCompile Include="Transform.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="TGLE.cpp" />
   </ItemGroup>
@@ -151,11 +152,12 @@
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="Transform.h" />
     <ClInclude Include="Shader.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="fragmentShader.frag" />
-    <None Include="lightSourceFragmentShader.frag" />
+    <None Include="textureShader.frag" />
+    <None Include="colorShader.frag" />
     <None Include="vertexShader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -36,19 +36,29 @@ Material::Material(const char* texturePath)
 	stbi_image_free(data);
 }
 
+Material::Material()
+{
+	
+}
+
+
+Material::Material(const glm::vec3 pColor)
+{
+	textureID = 0;
+	width = 0;
+	height = 0;
+	numberChannels = 0;
+	color = pColor;
+}
+
 Material::Material(const Material &pMaterial)
 {
 	textureID = pMaterial.textureID;
 	width = pMaterial.width;
 	height = pMaterial.height;
 	numberChannels = pMaterial.numberChannels;
+	color = pMaterial.GetColor();
 }
-
-Material::Material()
-{
-	
-}
-
 
 
 int Material::GetTextureID() const
@@ -59,4 +69,14 @@ int Material::GetTextureID() const
 void Material::Use() const
 {
 	glBindTexture(GL_TEXTURE_2D, textureID);
+}
+
+glm::vec3 Material::GetColor() const
+{
+	return color;
+}
+
+bool Material::HasTexture() const
+{
+	return textureID != 0;
 }

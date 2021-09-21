@@ -1,6 +1,6 @@
 #include "Camera.h"
 
-Camera::Camera(ProjectionType pProjection) : GameObject("Camera")
+Camera::Camera(ProjectionType pProjection) : GameObject("Camera", nullptr)
 {
 	if(pProjection == ProjectionType::Orthographic)
 	{
