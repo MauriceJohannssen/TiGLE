@@ -19,6 +19,8 @@ public:
 	void SetForward(const glm::vec3 pForward);
 	
 	glm::vec3 GetUp();
+
+	void Scale(glm::vec3 pScale);
 	
 	glm::mat4* GetObjectMatrix() const;
 

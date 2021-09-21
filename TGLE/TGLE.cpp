@@ -2,6 +2,7 @@
 
 #include "glad/glad.h"
 #include <SFML/Window.hpp>
+#include <SFML/Graphics/Image.hpp>
 #include <iostream>
 #include "Input.h"
 #include "Material.h"
@@ -29,6 +30,10 @@ int main()
 	sf::Window window(sf::VideoMode(1600, 900), "TGLE", sf::Style::Default, settings);
 	window.setVerticalSyncEnabled(true);
 	window.setActive(true);
+
+	sf::Image icon;
+	icon.loadFromFile("icon.png");
+	window.setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
 
 	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(sf::Context::getFunction)))
 	{
@@ -62,6 +67,7 @@ int main()
 	//TODO: Create light class
 	GameObject light("light", nullptr);
 	light.SetPosition(glm::vec3(-1, 0, -1));
+	light.Scale(glm::vec3(0.2f));
 
 	gameObjects.push_back(gameObject);
 	gameObjects.push_back(gameObject1);

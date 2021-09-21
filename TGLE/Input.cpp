@@ -22,7 +22,7 @@ void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
 			glViewport(0, 0, event.size.width, event.size.height);
 			break;
 		case sf::Event::KeyPressed:
-			glm::vec3 movementVector;
+			glm::vec3 movementVector(0);
 			switch(event.key.code)
 			{
 			case sf::Keyboard::W:
@@ -37,9 +37,13 @@ void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
 			case sf::Keyboard::D:
 				movementVector = glm::normalize(glm::cross(pCamera->GetForward(), pCamera->GetUp()));
 				break;
+			case sf::Keyboard::Escape:
+				pWindow->close();
+				break;
 			}
-
-			pCamera->Translate(movementVector * 10.0f * pDeltaTime);
+			
+			if(movementVector.length() > 0)
+				pCamera->Translate(movementVector * 10.0f * pDeltaTime);
 			break;
 
 		case sf::Event::MouseMoved:

@@ -48,6 +48,12 @@ glm::vec3 Transform::GetUp()
 	return objectSpace[1];
 }
 
+void Transform::Scale(glm::vec3 pScale)
+{
+	objectSpace = glm::scale(objectSpace, pScale);
+}
+
+
 glm::mat4* Transform::GetObjectMatrix() const
 {
 	return new glm::mat4(objectSpace);
