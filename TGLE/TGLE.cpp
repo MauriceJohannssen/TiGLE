@@ -96,6 +96,13 @@ int main()
 		//Input
 		HandleInput(&window, &mainCamera, deltaTime);
 
+		//Camera movement
+		if (mainCamera.movementVector.length() > 0.01f)
+		{
+			mainCamera.Translate(mainCamera.movementVector * 1.0f * deltaTime);
+			mainCamera.movementVector *= 0.9f;
+		}
+
 		//Update View Matrix
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
 
@@ -114,11 +121,11 @@ int main()
 void Render(Camera& camera, const std::vector<GameObject>& pGameObjects, const std::vector<Light>& pLights, 
 	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const Shader& colorShader, const Shader& textureShader, const Shader& lightShader)
 {
-	for(Light light : pLights)
+	for(const Light& light : pLights)
 	{
 		glBindVertexArray(light.GetVAO());
 		lightShader.Use();
-		glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *light.GetObjectMatrix();
+		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *light.GetObjectMatrix();
 		lightShader.SetMat4("transform", MVPMatrix);
 		lightShader.SetVec3("lightColor", light.GetLightColor());
 
@@ -128,10 +135,10 @@ void Render(Camera& camera, const std::vector<GameObject>& pGameObjects, const s
 		glBindVertexArray(0);
 	}
 
-	for (GameObject gameObject : pGameObjects)
+	for (const GameObject& gameObject : pGameObjects)
 	{
 		glBindVertexArray(gameObject.GetVAO());
-		glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *gameObject.GetObjectMatrix();
+		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *gameObject.GetObjectMatrix();
 
 		Shader shader = gameObject.GetMaterial().GetTextureID() == 0 ? colorShader : textureShader;
 		shader.Use();

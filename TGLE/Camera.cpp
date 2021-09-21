@@ -1,6 +1,6 @@
 #include "Camera.h"
 
-Camera::Camera(ProjectionType pProjection)
+Camera::Camera(ProjectionType pProjection) : movementVector(glm::vec3(0))
 {
 	if(pProjection == ProjectionType::Orthographic)
 	{
