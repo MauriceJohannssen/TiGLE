@@ -4,6 +4,8 @@
 #include <SFML/Window.hpp>
 #include <SFML/Graphics/Image.hpp>
 #include <iostream>
+#include <stb_image.h>
+
 #include "Input.h"
 #include "Material.h"
 #include "Shader.h"
@@ -16,8 +18,8 @@
 #include "Light.h"
 
 void DebugInformation();
-void Render(Camera& camera, const std::vector<GameObject>& pGameObjects, const std::vector<Light>& pLights, const glm::mat4& viewMatrix, 
-	const glm::mat4& projectionMatrix, const Shader& colorShader, const Shader& textureShader, const Shader& lightShader);
+void Render(Camera& camera, std::vector<GameObject>& pGameObjects, const std::vector<Light>& pLights, const glm::mat4& viewMatrix, 
+	const glm::mat4& projectionMatrix, const Shader& textureShader, const Shader& lightShader);
 
 int main()
 {
@@ -56,16 +58,14 @@ int main()
 	std::vector<GameObject> gameObjects;
 	std::vector<Light> lightSources;
 
-	Material redMaterial(glm::vec3(0.85f, 0.3f, 0.25f));
-	GameObject gameObject("gameObject_1", &redMaterial);
+	Material material("PlatesColor.png");
+	material.Add("PlatesRough.png");
+
+	GameObject gameObject("gameObject_1", &material);
 	gameObject.SetPosition(glm::vec3(1.0f, -1.0f, 0.5f));
 
-	Material greenMaterial(glm::vec3(0.15f, 0.85f, 0.35f));
-	GameObject gameObject1("gameObject_2", &greenMaterial);
-	gameObject1.SetPosition(glm::vec3(-2, 1, -1));
-
 	gameObjects.push_back(gameObject);
-	gameObjects.push_back(gameObject1);
+
 
 	Light light("light_1", Point, glm::vec3(1.0f, 1.0f, 1.0f));
 	light.SetPosition(glm::vec3(0, 0.5f, 0));
@@ -82,6 +82,29 @@ int main()
 	Camera mainCamera(Perspective);
 	mainCamera.SetPosition(glm::vec3(0, 0, 3));
 	mainCamera.SetForward(glm::vec3(0, 0, -1));
+
+
+	//int texWidth2 = 0;
+	//int texHeight2 = 0;
+	//unsigned int texID2 = 0;
+	//int texChann2 = 0;
+
+	//stbi_set_flip_vertically_on_load(true);
+	//unsigned char* data2 = stbi_load("PlatesRough.png", &texWidth2, &texHeight2, &texChann2, 0);
+
+
+	//glGenTextures(1, &texID2);
+	//glBindTexture(GL_TEXTURE_2D, texID2);
+
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth2, texHeight2, 0, GL_RED, GL_UNSIGNED_BYTE, data2);
+	//glGenerateMipmap(GL_TEXTURE_2D);
+
+	//glBindTexture(GL_TEXTURE_2D, 0);
 
 	while (window.isOpen())
 	{
@@ -105,10 +128,10 @@ int main()
 
 		//Update View Matrix
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
-
+		
 		//Render
-		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), colorShader, textureShader, lightShader);
-
+		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), colorShader, lightShader);
+		
 		//Swap Buffers
 		window.display();
 	}
@@ -118,8 +141,8 @@ int main()
 	return 0;
 }
 
-void Render(Camera& camera, const std::vector<GameObject>& pGameObjects, const std::vector<Light>& pLights, 
-	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const Shader& colorShader, const Shader& textureShader, const Shader& lightShader)
+void Render(Camera& camera, std::vector<GameObject>& pGameObjects, const std::vector<Light>& pLights, 
+	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const Shader& textureShader, const Shader& lightShader)
 {
 	for(const Light& light : pLights)
 	{
@@ -127,7 +150,7 @@ void Render(Camera& camera, const std::vector<GameObject>& pGameObjects, const s
 		lightShader.Use();
 		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *light.GetObjectMatrix();
 		lightShader.SetMat4("transform", MVPMatrix);
-		lightShader.SetVec3("lightColor", light.GetLightColor());
+		lightShader.SetVec3("lightColor",  glm::normalize(light.GetAmbient()));
 
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		//Todo: Get vertex count here!
@@ -135,31 +158,33 @@ void Render(Camera& camera, const std::vector<GameObject>& pGameObjects, const s
 		glBindVertexArray(0);
 	}
 
-	for (const GameObject& gameObject : pGameObjects)
+	for (GameObject& gameObject : pGameObjects)
 	{
 		glBindVertexArray(gameObject.GetVAO());
 		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *gameObject.GetObjectMatrix();
 
-		Shader shader = gameObject.GetMaterial().GetTextureID() == 0 ? colorShader : textureShader;
+		Shader shader = textureShader;
 		shader.Use();
 		//Only set when texture exists.
 		gameObject.GetMaterial().Use();
-
+	
 		shader.SetMat4("transform", MVPMatrix);
 		shader.SetMat4("objectMatrix", *gameObject.GetObjectMatrix()); //Temporary
 
 		//Object
 		Material material = gameObject.GetMaterial();
-		shader.SetVec3("material.ambient", material.GetColor());
-		shader.SetVec3("material.diffuse", material.GetColor());
-		shader.SetVec3("material.specular", material.GetColor());
+		shader.SetInt("material.diffuse", 0);
+		shader.SetInt("material.specular", 1);
 		shader.SetFloat("material.shininess",  material.GetShininess());
 		
 		//Load in all lights here
-		colorShader.SetVec3("lightPosition", pLights.at(0).GetPosition());
-		colorShader.SetVec3("lightColor", pLights.at(0).GetLightColor());
+		Light light = pLights.at(0);
+		shader.SetVec3("light.lightPosition",light.GetPosition());
+		shader.SetVec3("light.ambient", light.GetAmbient());
+		shader.SetVec3("light.diffuse", light.GetDiffuse());
+		shader.SetVec3("light.specular", light.GetSpecular());
 		
-		colorShader.SetVec3("cameraPosition", camera.GetPosition());
+		shader.SetVec3("cameraPosition", camera.GetPosition());
 
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		//Todo: Get vertex count here!

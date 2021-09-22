@@ -4,36 +4,9 @@
 #include <iostream>
 #include "glad/glad.h"
 
-Material::Material(const char* texturePath)
+Material::Material(const char* texturePath): textureID(0), textureIDSpecular(0), shininess(32)
 {
-	textureID = 0;
-	width = 0;
-	height = 0;
-	numberChannels = 0;
-
-	stbi_set_flip_vertically_on_load(true);
-	unsigned char* data = stbi_load(texturePath, &width, &height, &numberChannels, 0);
-
-	if(data)
-	{
-		glGenTextures(1, &textureID);
-		glBindTexture(GL_TEXTURE_2D, textureID);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-		glGenerateMipmap(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, 0);
-	}
-	else
-	{
-		std::cout << "Failed to load texture." << std::endl;
-	}
-	
-	stbi_image_free(data);
+	LoadTexture(texturePath, textureID, GL_RGB);
 }
 
 Material::Material()
@@ -44,50 +17,30 @@ Material::Material()
 
 Material::Material(const glm::vec3 pColor)
 {
-	textureID = 0;
-	width = 0;
-	height = 0;
-	numberChannels = 0;
-	ambient = pColor;
-	diffuse = ambient;
-	specular = ambient;
-	shininess = 32;
+	
 }
 
 Material::Material(const Material &pMaterial)
 {
 	textureID = pMaterial.textureID;
-	width = pMaterial.width;
-	height = pMaterial.height;
-	numberChannels = pMaterial.numberChannels;
-	ambient = pMaterial.GetColor();
+	textureIDSpecular = pMaterial.textureIDSpecular;
+	shininess = pMaterial.shininess;
 }
 
 
-int Material::GetTextureID() const
+unsigned int Material::GetTextureID() const
 {
 	return textureID;
 }
 
 void Material::Use() const
 {
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, textureID);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, textureIDSpecular);
 }
 
-glm::vec3 Material::GetColor() const
-{
-	return ambient;
-}
-
-glm::vec3 Material::GetDiffuse() const
-{
-	return diffuse;
-}
-
-glm::vec3 Material::GetSpecular() const
-{
-	return specular;
-}
 
 float Material::GetShininess() const
 {
@@ -98,4 +51,43 @@ float Material::GetShininess() const
 bool Material::HasTexture() const
 {
 	return textureID != 0;
+}
+
+void Material::LoadTexture(const char* path, unsigned int& ID, GLenum format)
+{
+	int width = 0, height = 0, numberChannels = 0;
+	stbi_set_flip_vertically_on_load(true);
+	unsigned char* data = stbi_load(path, &width, &height, &numberChannels, 0);
+	
+	if (data)
+	{
+		glGenTextures(1, &ID);
+		glBindTexture(GL_TEXTURE_2D, ID);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	else
+	{
+		std::cout << "Failed to load texture." << std::endl;
+	}
+
+	stbi_image_free(data);
+}
+
+void Material::Add(const char* path)
+{
+	LoadTexture(path, textureIDSpecular, GL_RED);
+}
+
+unsigned int Material::GetSpecularID() const
+{
+	return textureIDSpecular;
 }
