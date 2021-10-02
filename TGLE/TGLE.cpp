@@ -58,13 +58,21 @@ int main()
 	std::vector<GameObject> gameObjects;
 	std::vector<Light> lightSources;
 
-	Material material("PlatesColor.png");
-	material.Add("PlatesRough.png");
+	Material material("MetalColor.png");
+	material.Add("MetalMetalness.png");
 
 	GameObject gameObject("gameObject_1", &material);
 	gameObject.SetPosition(glm::vec3(1.0f, -1.0f, 0.5f));
 
+	Material material2("WoodFloorColor.png");
+	material2.Add("WoodFloorRough.png");
+
+	GameObject gameObject2("gameObject_2", &material2);
+	gameObject2.SetPosition(glm::vec3(0.1f, -0.2f, -0.5f));
+	gameObject2.Scale(glm::vec3(0.5f));
+
 	gameObjects.push_back(gameObject);
+	gameObjects.push_back(gameObject2);
 
 
 	Light light("light_1", Point, glm::vec3(1.0f, 1.0f, 1.0f));
@@ -83,29 +91,6 @@ int main()
 	mainCamera.SetPosition(glm::vec3(0, 0, 3));
 	mainCamera.SetForward(glm::vec3(0, 0, -1));
 
-
-	//int texWidth2 = 0;
-	//int texHeight2 = 0;
-	//unsigned int texID2 = 0;
-	//int texChann2 = 0;
-
-	//stbi_set_flip_vertically_on_load(true);
-	//unsigned char* data2 = stbi_load("PlatesRough.png", &texWidth2, &texHeight2, &texChann2, 0);
-
-
-	//glGenTextures(1, &texID2);
-	//glBindTexture(GL_TEXTURE_2D, texID2);
-
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth2, texHeight2, 0, GL_RED, GL_UNSIGNED_BYTE, data2);
-	//glGenerateMipmap(GL_TEXTURE_2D);
-
-	//glBindTexture(GL_TEXTURE_2D, 0);
-
 	while (window.isOpen())
 	{
 		//Buffer Clearing
@@ -122,7 +107,7 @@ int main()
 		//Camera movement
 		if (mainCamera.movementVector.length() > 0.01f)
 		{
-			mainCamera.Translate(mainCamera.movementVector * 1.0f * deltaTime);
+			mainCamera.Translate(mainCamera.movementVector * 0.2f * deltaTime);
 			mainCamera.movementVector *= 0.9f;
 		}
 

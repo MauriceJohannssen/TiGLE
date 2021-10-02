@@ -2,3 +2,10 @@ C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\TGLE.vcxproj.CopyComplete
 C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\TGLE.exe
 C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\sfml-system-d-2.dll
 C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\sfml-window-d-2.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\sfml-graphics-d-2.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\freetyped.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\zlibd1.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\bz2d.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\libpng16d.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\brotlidec.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\brotlicommon.dll
