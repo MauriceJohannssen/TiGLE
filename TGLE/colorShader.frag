@@ -20,7 +20,7 @@ struct Material
 uniform Material material;
 
 //Lighting
-struct Light
+struct PointLight
 {
 	vec3 position;
 
@@ -33,30 +33,40 @@ struct Light
 	float quadratic;
 };
 
-uniform Light light;
+#define POINT_LIGHT_COUNT 3  
+uniform PointLight pointLights[POINT_LIGHT_COUNT];
 
 //Camera
 uniform vec3 cameraPosition;
 
+vec3 CalcDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition, vec3 pViewDirection);
+
 void main()
 {
-	vec3 ambient = vec3(texture(material.texture_diffuse1, vUVs)) * light.ambient;
-
-	vec3 normal = normalize(vNormal);
-	vec3 lightDirection = normalize(light.position - vFragPosition);
-	vec3 diffuse = (max(dot(normal, lightDirection), 0.0) * vec3(texture(material.texture_diffuse1, vUVs))) * light.diffuse;
-
-	vec3 viewDirection = normalize(cameraPosition - vFragPosition);
-	vec3 reflectedLightDirection = reflect(-lightDirection, normalize(vNormal));
-	float finalSpecular = pow(max(dot(viewDirection, reflectedLightDirection),0.0), 64);
-	vec3 specular = (finalSpecular * vec3(texture(material.texture_specular1, vUVs).r)) * light.specular;
-
-	//Point light
-	//Attenuation
-	float distanceLightFrag = length(light.position - vFragPosition);
-	float attenuation = 1.0 / (light.constant + light.linear * distanceLightFrag + light.quadratic * (distanceLightFrag * distanceLightFrag));
-
-	vec3 finalColor = (ambient + diffuse + specular) * attenuation;
-
+	vec3 finalColor = vec3(0,0,0);
+	for(int i = 0; i < POINT_LIGHT_COUNT; i++)
+	{
+		finalColor += CalcDirectionalLight(pointLights[i], normalize(vNormal), vFragPosition, cameraPosition - vFragPosition);
+	}
 	fragColor = vec4(finalColor,1);
+}
+
+
+vec3 CalcDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition, vec3 pViewDirection)
+{
+	//Ambient
+	pViewDirection = normalize(pViewDirection);
+	vec3 ambient = vec3(texture(material.texture_diffuse1, vUVs)) * pointLight.ambient;
+	//Diffuse
+	vec3 lightDirection = normalize(pointLight.position - vFragPosition);
+	vec3 diffuse = max(dot(pNormal, lightDirection), 0.0) * vec3(texture(material.texture_diffuse1, vUVs)) * pointLight.diffuse;
+	//Specular
+	vec3 reflectedLightDirection = reflect(-lightDirection, pNormal);
+	float finalSpecular = pow(max(dot(pViewDirection, reflectedLightDirection),0.0), 32);
+	vec3 specular = (finalSpecular * vec3(texture(material.texture_specular1, vUVs))) * pointLight.specular;
+	//Attenuation
+	float distanceLightFrag = length(pointLight.position - vFragPosition);
+	float attenuation = 1.0 / (pointLight.constant + pointLight.linear * distanceLightFrag + pointLight.quadratic * (distanceLightFrag * distanceLightFrag));
+
+	return (ambient + diffuse + specular) * attenuation;
 }

@@ -30,7 +30,7 @@ int main()
 	settings.majorVersion = 3;
 	settings.minorVersion = 3;
 
-	sf::Window window(sf::VideoMode(1600, 900), "TGLE", sf::Style::Default, settings);
+	sf::Window window(sf::VideoMode(1600, 900), "TiGLE", sf::Style::Default, settings);
 	window.setVerticalSyncEnabled(true);
 	window.setActive(true);
 
@@ -59,14 +59,24 @@ int main()
 
 	//GameObjects
 	GameObject gameObject1("Models/R99/R99.obj");
-	gameObject1.SetPosition(glm::vec3(0.5f, -0.2f, -0.5f));
+	gameObject1.SetPosition(glm::vec3(0));
 	gameObjects.push_back(gameObject1);
 
 	//Lights
-	Light light("light_1", Point, glm::vec3(1.0f, 1.0f, 1.0f), "Models/Cube/Cube.obj");
-	light.SetPosition(glm::vec3(1.6f, 0.4f, 1.8f));
+	Light light("light_1", Point, glm::vec3(0.05f, 0.96f, 0.6f), "Models/Cube/Cube.obj");
+	light.SetPosition(glm::vec3(1,0,0));
 	light.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light);
+
+	Light light2("light_2", Point, glm::vec3(0.95f, 0.0f, 0.8f), "Models/Cube/Cube.obj");
+	light2.SetPosition(glm::vec3(0.5f, 0.5f, -1.0f));
+	light2.Scale(glm::vec3(0.05f));
+	lightSources.push_back(light2);
+
+	Light light3("light_3", Point, glm::vec3(1.0f, 0.15f, 0.0f), "Models/Cube/Cube.obj");
+	light3.SetPosition(glm::vec3(0.5f, 0.5f, 1.0f));
+	light3.Scale(glm::vec3(0.05f));
+	lightSources.push_back(light3);
 
 	//Time
 	sf::Clock clock;
@@ -97,6 +107,8 @@ int main()
 			mainCamera.Translate(mainCamera.movementVector * 0.8f * deltaTime);
 			mainCamera.movementVector *= 0.9f;
 		}
+
+		glm::vec3 pos = mainCamera.GetPosition();
 
 		//Update View Matrix
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
@@ -132,14 +144,39 @@ void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<L
 		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *gameObject.GetObjectMatrix();
 		shader.SetMat4("transform", MVPMatrix);
 		shader.SetVec3("cameraPosition", camera.GetPosition());
+
+		//This is inefficient and just for testing purposes!
+		//Use uniform buffer objects or classes.
+
 		Light light = pLights.at(0);
-		shader.SetVec3("light.position",light.GetPosition());
-		shader.SetVec3("light.ambient", light.GetAmbient());
-		shader.SetVec3("light.diffuse", light.GetDiffuse());
-		shader.SetVec3("light.specular", light.GetSpecular());
-		shader.SetFloat("light.constant", 1.0f);
-		shader.SetFloat("light.linear", 0.07f);
-		shader.SetFloat("light.quadratic", 0.3f);
+		glm::vec3 lig = gameObject.GetPosition();
+		shader.SetVec3("pointLights[0].position",light.GetPosition());
+		shader.SetVec3("pointLights[0].ambient", light.GetAmbient());
+		shader.SetVec3("pointLights[0].diffuse", light.GetDiffuse());
+		shader.SetVec3("pointLights[0].specular", light.GetSpecular());
+		shader.SetFloat("pointLights[0].constant", 1.0f);
+		shader.SetFloat("pointLights[0].linear", 0.07f);
+		shader.SetFloat("pointLights[0].quadratic", 0.3f); 
+		std::cout << "GO's position is: (" << lig.x << ", " << lig.y << ", " << lig.z << ")" << std::endl;
+
+		light = pLights.at(1);
+		shader.SetVec3("pointLights[1].position", light.GetPosition());
+		shader.SetVec3("pointLights[1].ambient", light.GetAmbient());
+		shader.SetVec3("pointLights[1].diffuse", light.GetDiffuse());
+		shader.SetVec3("pointLights[1].specular", light.GetSpecular());
+		shader.SetFloat("pointLights[1].constant", 1.0f);
+		shader.SetFloat("pointLights[1].linear", 0.07f);
+		shader.SetFloat("pointLights[1].quadratic", 0.3f);
+
+		light = pLights.at(2);
+		shader.SetVec3("pointLights[2].position", light.GetPosition());
+		shader.SetVec3("pointLights[2].ambient", light.GetAmbient());
+		shader.SetVec3("pointLights[2].diffuse", light.GetDiffuse());
+		shader.SetVec3("pointLights[2].specular", light.GetSpecular());
+		shader.SetFloat("pointLights[2].constant", 1.0f);
+		shader.SetFloat("pointLights[2].linear", 0.07f);
+		shader.SetFloat("pointLights[2].quadratic", 0.3f);
+
 		gameObject.Draw(shader);
 	}
 }
