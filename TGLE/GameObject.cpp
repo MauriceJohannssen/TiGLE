@@ -106,17 +106,32 @@ std::vector<Texture> GameObject::LoadMaterialTextures(aiMaterial* material, aiTe
 	{
 		aiString str;
 		material->GetTexture(type, i, &str);
-		Texture texture;
-		texture.id = TextureFromFile(str.C_Str(), directory);
-		texture.type = typeName;
-		texture.path = str.C_Str();
-		textures.push_back(texture);
+		bool skipTextureLoad = false;
+		for (unsigned int j = 0; j < loadedTextures.size(); j++)
+		{
+			if (std::strcmp(loadedTextures[j].path.data(), str.C_Str()) == 0)
+			{
+				textures.push_back(loadedTextures[j]);
+				skipTextureLoad = true;
+				break;
+			}
+		}
+
+		if (!skipTextureLoad)
+		{
+			Texture texture;
+			texture.id = CreateTextureFromFile(str.C_Str(), directory);
+			texture.type = typeName;
+			texture.path = str.C_Str();
+			textures.push_back(texture);
+			loadedTextures.push_back(texture);
+		}
 	}
 	return textures;
 }
 
 
-unsigned int GameObject::TextureFromFile(const char* path, const std::string& directory)
+unsigned int GameObject::CreateTextureFromFile(const char* path, const std::string& directory)
 {
 	std::string filename = std::string(path);
 	filename = directory + '/' + filename;
@@ -124,18 +139,25 @@ unsigned int GameObject::TextureFromFile(const char* path, const std::string& di
 	unsigned int textureID;
 	glGenTextures(1, &textureID);
 
-	int width, height, nrComponents;
-	unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
+	int width, height, numberComponents;
+	unsigned char* data = stbi_load(filename.c_str(), &width, &height, &numberComponents, 0);
 	if (data)
 	{
 		GLenum format;
-		if (nrComponents == 1)
+		switch (numberComponents)
+		{
+		case 1:
 			format = GL_RED;
-		else if (nrComponents == 3)
+			break;
+		case 3:
 			format = GL_RGB;
-		else if (nrComponents == 4)
+			break;
+		case 4:
 			format = GL_RGBA;
-
+			break;
+		default:
+			std::cout << "Error::TextureFromFile::Could not assign texture format!" << std::endl;
+		}
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
