@@ -9,6 +9,7 @@
 #include <sstream>
 #include <iostream>
 #include <glm/fwd.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 class Shader
 {

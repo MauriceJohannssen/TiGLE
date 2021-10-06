@@ -1,7 +1,8 @@
 ﻿#include "Light.h"
 
-Light::Light(std::string pName, LightType pLightType, glm::vec3 pColor) : GameObject(pName, new Material(pColor)), lightType(pLightType), ambient(pColor), diffuse(pColor), specular(pColor), intensity(1)
+Light::Light(std::string pName, LightType pLightType, glm::vec3 pColor, const char* path, float pIntensity) : GameObject(path), lightType(pLightType), ambient(pColor), diffuse(pColor), specular(pColor), intensity(1)
 {
+	
 }
 
 glm::vec3 Light::GetAmbient() const
@@ -19,4 +20,8 @@ glm::vec3 Light::GetSpecular() const
 	return specular * intensity;
 }
 
+LightType Light::GetLightType() const
+{
+	return lightType;
+}
 

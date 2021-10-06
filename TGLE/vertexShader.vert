@@ -13,8 +13,8 @@ uniform mat4 objectMatrix;
 
 void main()
 {
-	gl_Position = transform * vec4(inPosition, 1.0f);
+	gl_Position = transform * vec4(inPosition, 1.0);
 	vUVs = inUVs;
 	vNormal = inNormal;
-	vFragPosition = vec3(objectMatrix * vec4(inPosition,1));
+	vFragPosition = vec3(objectMatrix * vec4(inPosition,1.0));
 }

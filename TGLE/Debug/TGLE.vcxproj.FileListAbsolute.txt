@@ -9,3 +9,6 @@ C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\bz2d.dll
 C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\libpng16d.dll
 C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\brotlidec.dll
 C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\brotlicommon.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\assimp-vc142-mtd.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\Irrlicht.dll
+C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\jpeg62.dll

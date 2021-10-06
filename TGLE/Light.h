@@ -1,6 +1,6 @@
 ﻿#pragma once
-#include "GameObject.h"
 #include "Transform.h"
+#include "GameObject.h"
 
 enum LightType
 {
@@ -12,10 +12,11 @@ enum LightType
 class Light : public GameObject
 {
 public:
-	Light(std::string pName, LightType pLightType, glm::vec3 pColor);
+	Light(std::string pName, LightType pLightType, glm::vec3 pColor, const char* path, float pIntensity = 1.0f);
 	glm::vec3 GetAmbient() const;
 	glm::vec3 GetDiffuse() const;
 	glm::vec3 GetSpecular() const;
+	LightType GetLightType() const;
 
 private:
 	LightType lightType;

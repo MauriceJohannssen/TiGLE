@@ -1,20 +1,2 @@
-﻿  Camera.cpp
-  GameObject.cpp
-  Input.cpp
-C:\Users\Mauri\Repositories\DirectX12\TGLE\Input.cpp(57,23): warning C4244: 'initializing': conversion from 'const T' to 'float', possible loss of data
-          with
-          [
-              T=int
-          ]
-C:\Users\Mauri\Repositories\DirectX12\TGLE\Input.cpp(58,23): warning C4244: 'initializing': conversion from 'const T' to 'float', possible loss of data
-          with
-          [
-              T=int
-          ]
-  Light.cpp
-  Material.cpp
-  Transform.cpp
-  Shader.cpp
-  TGLE.cpp
-  Generating Code...
+﻿  TGLE.cpp
   TGLE.vcxproj -> C:\Users\Mauri\Repositories\DirectX12\TGLE\Debug\TGLE.exe

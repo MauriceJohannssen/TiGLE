@@ -9,7 +9,6 @@ public:
 	Transform();
 	Transform(std::string& pName);
 
-	//Transform related methods
 	glm::vec3 GetPosition() const;
 	void SetPosition(const glm::vec3 pPosition);
 
@@ -20,7 +19,7 @@ public:
 	
 	glm::vec3 GetUp() const;
 
-	void Scale(glm::vec3 pScale);
+	void Scale(const glm::vec3 pScale);
 	
 	glm::mat4* GetObjectMatrix() const;
 

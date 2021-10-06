@@ -2,18 +2,18 @@
 
 unsigned int Transform::ObjectCount = 0;
 
-Transform::Transform()
+Transform::Transform() : objectSpace(glm::mat4(1))
 {
 	//TODO: Keep track of deletions in destructor
 	if (ObjectCount == 0)
 	{
-		name = "gameObject_" + ObjectCount;
+		name = "gameObject_" + ObjectCount++;
 	}
 }
 
-Transform::Transform(std::string& pName) : name(pName)
+Transform::Transform(std::string& pName) : name(pName), objectSpace(glm::mat4(1))
 {
-	objectSpace = glm::mat4(1);
+	
 }
 
 glm::vec3 Transform::GetPosition() const
@@ -48,7 +48,7 @@ glm::vec3 Transform::GetUp() const
 	return objectSpace[1];
 }
 
-void Transform::Scale(glm::vec3 pScale)
+void Transform::Scale(const glm::vec3 pScale)
 {
 	objectSpace = glm::scale(objectSpace, pScale);
 }

@@ -18,8 +18,8 @@
 #include "Light.h"
 
 void DebugInformation();
-void Render(Camera& camera, std::vector<GameObject>& pGameObjects, const std::vector<Light>& pLights, const glm::mat4& viewMatrix, 
-	const glm::mat4& projectionMatrix, const Shader& textureShader, const Shader& lightShader);
+void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& viewMatrix, 
+	const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader);
 
 int main()
 {
@@ -52,33 +52,20 @@ int main()
 	glEnable(GL_DEPTH_TEST);
 
 	Shader colorShader("vertexShader.vert", "colorShader.frag");
-	Shader textureShader("vertexShader.vert", "textureShader.frag");
 	Shader lightShader("vertexShader.vert", "lightShader.frag");
 
 	std::vector<GameObject> gameObjects;
 	std::vector<Light> lightSources;
 
-	Material material("MetalColor.png");
-	material.Add("MetalMetalness.png");
+	//GameObjects
+	GameObject gameObject1("Models/R99/R99.obj");
+	gameObject1.SetPosition(glm::vec3(0.5f, -0.2f, -0.5f));
+	gameObjects.push_back(gameObject1);
 
-	GameObject gameObject("gameObject_1", &material);
-	gameObject.SetPosition(glm::vec3(1.0f, -1.0f, 0.5f));
-
-	Material material2("WoodFloorColor.png");
-	material2.Add("WoodFloorRough.png");
-
-	GameObject gameObject2("gameObject_2", &material2);
-	gameObject2.SetPosition(glm::vec3(0.1f, -0.2f, -0.5f));
-	gameObject2.Scale(glm::vec3(0.5f));
-
-	gameObjects.push_back(gameObject);
-	gameObjects.push_back(gameObject2);
-
-
-	Light light("light_1", Point, glm::vec3(1.0f, 1.0f, 1.0f));
-	light.SetPosition(glm::vec3(0, 0.5f, 0));
-	light.Scale(glm::vec3(0.2f));
-
+	//Lights
+	Light light("light_1", Point, glm::vec3(1.0f, 1.0f, 1.0f), "Models/Cube/Cube.obj");
+	light.SetPosition(glm::vec3(1.6f, 0.4f, 1.8f));
+	light.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light);
 
 	//Time
@@ -107,7 +94,7 @@ int main()
 		//Camera movement
 		if (mainCamera.movementVector.length() > 0.01f)
 		{
-			mainCamera.Translate(mainCamera.movementVector * 0.2f * deltaTime);
+			mainCamera.Translate(mainCamera.movementVector * 0.8f * deltaTime);
 			mainCamera.movementVector *= 0.9f;
 		}
 
@@ -126,55 +113,34 @@ int main()
 	return 0;
 }
 
-void Render(Camera& camera, std::vector<GameObject>& pGameObjects, const std::vector<Light>& pLights, 
-	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const Shader& textureShader, const Shader& lightShader)
+void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, 
+	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader)
 {
-	for(const Light& light : pLights)
+	for(Light& light : pLights)
 	{
-		glBindVertexArray(light.GetVAO());
 		lightShader.Use();
 		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *light.GetObjectMatrix();
 		lightShader.SetMat4("transform", MVPMatrix);
 		lightShader.SetVec3("lightColor",  glm::normalize(light.GetAmbient()));
-
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		//Todo: Get vertex count here!
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-		glBindVertexArray(0);
+		light.Draw(lightShader);
 	}
 
-	for (GameObject& gameObject : pGameObjects)
+
+	for(GameObject& gameObject : pGameObjects)
 	{
-		glBindVertexArray(gameObject.GetVAO());
-		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *gameObject.GetObjectMatrix();
-
-		Shader shader = textureShader;
 		shader.Use();
-		//Only set when texture exists.
-		gameObject.GetMaterial().Use();
-	
+		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *gameObject.GetObjectMatrix();
 		shader.SetMat4("transform", MVPMatrix);
-		shader.SetMat4("objectMatrix", *gameObject.GetObjectMatrix()); //Temporary
-
-		//Object
-		Material material = gameObject.GetMaterial();
-		shader.SetInt("material.diffuse", 0);
-		shader.SetInt("material.specular", 1);
-		shader.SetFloat("material.shininess",  material.GetShininess());
-		
-		//Load in all lights here
+		shader.SetVec3("cameraPosition", camera.GetPosition());
 		Light light = pLights.at(0);
-		shader.SetVec3("light.lightPosition",light.GetPosition());
+		shader.SetVec3("light.position",light.GetPosition());
 		shader.SetVec3("light.ambient", light.GetAmbient());
 		shader.SetVec3("light.diffuse", light.GetDiffuse());
 		shader.SetVec3("light.specular", light.GetSpecular());
-		
-		shader.SetVec3("cameraPosition", camera.GetPosition());
-
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		//Todo: Get vertex count here!
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-		glBindVertexArray(0);
+		shader.SetFloat("light.constant", 1.0f);
+		shader.SetFloat("light.linear", 0.07f);
+		shader.SetFloat("light.quadratic", 0.3f);
+		gameObject.Draw(shader);
 	}
 }
 
