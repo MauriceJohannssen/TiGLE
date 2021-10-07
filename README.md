@@ -1,7 +1,7 @@
 ### Tiny OpenGL Engine
 
 #### The project and wiki is work in progress.
-##### Roadmap (until 7th of October)
+##### Roadmap (until 7th of November)
 - HDR (work in progress)
 - Bloom
 - Depth-Of-Field
