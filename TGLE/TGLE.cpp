@@ -18,7 +18,7 @@
 #include "Light.h"
 
 void DebugInformation();
-void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& viewMatrix, 
+void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& viewMatrix,
 	const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader);
 
 int main()
@@ -63,19 +63,19 @@ int main()
 	gameObjects.push_back(gameObject1);
 
 	//Lights
-	Light light("light_1", Point, glm::vec3(0.05f, 0.96f, 0.6f), "Models/Cube/Cube.obj");
-	light.SetPosition(glm::vec3(1,0,0));
-	light.Scale(glm::vec3(0.05f));
+	Light light("light_1", Point, glm::vec3(242, 19, 215) / 255.0f, "Models/Cube/Cube.obj");
+	light.SetPosition(glm::vec3(0.5f, 0.5f, 1));
+	light.Scale(glm::vec3(0.1));
 	lightSources.push_back(light);
 
-	Light light2("light_2", Point, glm::vec3(0.95f, 0.0f, 0.8f), "Models/Cube/Cube.obj");
-	light2.SetPosition(glm::vec3(0.5f, 0.5f, -1.0f));
-	light2.Scale(glm::vec3(0.05f));
+	Light light2("light_2", Point, glm::vec3(0, 78, 235) / 255.0f, "Models/Cube/Cube.obj");
+	light2.SetPosition(glm::vec3(0.5f, 0.5, -1));
+	light2.Scale(glm::vec3(0.1f));
 	lightSources.push_back(light2);
 
-	Light light3("light_3", Point, glm::vec3(1.0f, 0.15f, 0.0f), "Models/Cube/Cube.obj");
-	light3.SetPosition(glm::vec3(0.5f, 0.5f, 1.0f));
-	light3.Scale(glm::vec3(0.05f));
+	Light light3("light_3", Point, glm::vec3(56, 240, 70) / 255.0f, "Models/Cube/Cube.obj");
+	light3.SetPosition(glm::vec3(1, 0, 0));
+	light3.Scale(glm::vec3(0.1f));
 	lightSources.push_back(light3);
 
 	//Time
@@ -108,14 +108,12 @@ int main()
 			mainCamera.movementVector *= 0.9f;
 		}
 
-		glm::vec3 pos = mainCamera.GetPosition();
-
 		//Update View Matrix
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
-		
+
 		//Render
 		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), colorShader, lightShader);
-		
+
 		//Swap Buffers
 		window.display();
 	}
@@ -125,39 +123,39 @@ int main()
 	return 0;
 }
 
-void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, 
+void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights,
 	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader)
 {
-	for(Light& light : pLights)
+	for (Light& light : pLights)
 	{
 		lightShader.Use();
 		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *light.GetObjectMatrix();
 		lightShader.SetMat4("transform", MVPMatrix);
-		lightShader.SetVec3("lightColor",  glm::normalize(light.GetAmbient()));
+		lightShader.SetMat4("objectMatrix", *light.GetObjectMatrix());
+		lightShader.SetVec3("lightColor", glm::normalize(light.GetAmbient()));
 		light.Draw(lightShader);
 	}
 
 
-	for(GameObject& gameObject : pGameObjects)
+	for (GameObject& gameObject : pGameObjects)
 	{
 		shader.Use();
 		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *gameObject.GetObjectMatrix();
 		shader.SetMat4("transform", MVPMatrix);
+		shader.SetMat4("objectMatrix", *gameObject.GetObjectMatrix());
 		shader.SetVec3("cameraPosition", camera.GetPosition());
 
 		//This is inefficient and just for testing purposes!
 		//Use uniform buffer objects or classes.
 
 		Light light = pLights.at(0);
-		glm::vec3 lig = gameObject.GetPosition();
-		shader.SetVec3("pointLights[0].position",light.GetPosition());
+		shader.SetVec3("pointLights[0].position", light.GetPosition());
 		shader.SetVec3("pointLights[0].ambient", light.GetAmbient());
 		shader.SetVec3("pointLights[0].diffuse", light.GetDiffuse());
 		shader.SetVec3("pointLights[0].specular", light.GetSpecular());
 		shader.SetFloat("pointLights[0].constant", 1.0f);
 		shader.SetFloat("pointLights[0].linear", 0.07f);
-		shader.SetFloat("pointLights[0].quadratic", 0.3f); 
-		std::cout << "GO's position is: (" << lig.x << ", " << lig.y << ", " << lig.z << ")" << std::endl;
+		shader.SetFloat("pointLights[0].quadratic", 0.3f);
 
 		light = pLights.at(1);
 		shader.SetVec3("pointLights[1].position", light.GetPosition());
