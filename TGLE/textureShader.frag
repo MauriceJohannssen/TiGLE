@@ -1,14 +1,17 @@
 #version 330 core
-
-in vec2 vTexCoords;
 out vec4 fragColor;
 
-uniform sampler2D inTexture;
-uniform vec3 lightColor;
+in vec2 vUVs;
+
+uniform sampler2D screenTexture;
 
 void main()
 {
-	float ambientStrength = 0.1;
-	vec3 ambient = ambientStrength * lightColor;
-	fragColor = texture(inTexture, vTexCoords) * vec4(ambient,1);
-}
+    const float gamma = 2.2;
+    //This will be a uniform
+    const float exposure = 0.5;
+    vec3 colorHDR = texture(screenTexture, vUVs).rgb;
+    vec3 mappedColorLDR = vec3(1.0) - exp(-colorHDR * exposure); 
+    mappedColorLDR = pow(mappedColorLDR, vec3(1.0 / gamma));
+    fragColor = vec4(mappedColorLDR, 1.0);
+} 

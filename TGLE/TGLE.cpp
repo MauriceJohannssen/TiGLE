@@ -19,7 +19,19 @@
 
 void DebugInformation();
 void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& viewMatrix,
-	const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader);
+	const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader, unsigned int fb, Shader& textureShader,
+	unsigned int quadVAO, unsigned int tcb);
+
+float quadVertices[] = {
+	// positions   // texCoords
+	-1.0f,  1.0f,  0.0f, 1.0f,
+	-1.0f, -1.0f,  0.0f, 0.0f,
+	 1.0f, -1.0f,  1.0f, 0.0f,
+
+	-1.0f,  1.0f,  0.0f, 1.0f,
+	 1.0f, -1.0f,  1.0f, 0.0f,
+	 1.0f,  1.0f,  1.0f, 1.0f
+};
 
 int main()
 {
@@ -51,8 +63,54 @@ int main()
 
 	glEnable(GL_DEPTH_TEST);
 
-	Shader colorShader("vertexShader.vert", "colorShader.frag");
-	Shader lightShader("vertexShader.vert", "lightShader.frag");
+	//Create a framebuffer
+	unsigned int framebuffer;
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+	//Create attachment for the framebuffer, which is a texture in this case, since it must be read from.
+	unsigned int textureColorbuffer;
+	glGenTextures(1, &textureColorbuffer);
+	glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 1600, 800, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+	//No need to set mipmap option here.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	//Bind to framebuffer
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+
+	//Create Renderbuffer object for depth (and potentially stencil) values.
+	unsigned int renderbuffer;
+	glGenRenderbuffers(1, &renderbuffer);
+	glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1600, 800);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer);
+
+	//Unbind framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	//Create quad to render texture
+	unsigned int quadVAO;
+	glGenVertexArrays(1, &quadVAO);
+	glBindVertexArray(quadVAO);
+	
+	unsigned int quadVBO;
+	glGenBuffers(1, &quadVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(0));
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(2 * sizeof(float)));
+	glBindVertexArray(0);
+
+	Shader colorShader("shader.vert", "shader.frag");
+	Shader lightShader("shader.vert", "lightShader.frag");
+	Shader textureShader("textureShader.vert", "textureShader.frag");
+	textureShader.Use();
+	textureShader.SetInt("screenTexture", 0);
 
 	std::vector<GameObject> gameObjects;
 	std::vector<Light> lightSources;
@@ -63,17 +121,17 @@ int main()
 	gameObjects.push_back(gameObject1);
 
 	//Lights
-	Light light("light_1", Point, glm::vec3(242, 19, 215) / 255.0f, "Models/Cube/Cube.obj");
+	Light light("light_1", Point, glm::vec3(0.96f, 0.05f, 0.87f), "Models/Cube/Cube.obj", 5);
 	light.SetPosition(glm::vec3(0.5f, 0.5f, 1));
 	light.Scale(glm::vec3(0.1));
 	lightSources.push_back(light);
 
-	Light light2("light_2", Point, glm::vec3(0, 78, 235) / 255.0f, "Models/Cube/Cube.obj");
+	Light light2("light_2", Point, glm::vec3(0.0f, 0.31f, 0.95f), "Models/Cube/Cube.obj", 7);
 	light2.SetPosition(glm::vec3(0.5f, 0.5, -1));
 	light2.Scale(glm::vec3(0.1f));
 	lightSources.push_back(light2);
 
-	Light light3("light_3", Point, glm::vec3(56, 240, 70) / 255.0f, "Models/Cube/Cube.obj");
+	Light light3("light_3", Point, glm::vec3(0.24f, 0.95f, 0.13f), "Models/Cube/Cube.obj", 3);
 	light3.SetPosition(glm::vec3(1, 0, 0));
 	light3.Scale(glm::vec3(0.1f));
 	lightSources.push_back(light3);
@@ -112,7 +170,8 @@ int main()
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
 
 		//Render
-		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), colorShader, lightShader);
+		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), colorShader, lightShader, framebuffer, 
+			textureShader, quadVAO, textureColorbuffer);
 
 		//Swap Buffers
 		window.display();
@@ -124,15 +183,23 @@ int main()
 }
 
 void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights,
-	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader)
+	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader, unsigned int fb,
+	Shader& textureShader, unsigned int quadVAO, unsigned int tcb)
 {
+	//Bind off-screen framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, fb);
+	glEnable(GL_DEPTH_TEST);
+
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 	for (Light& light : pLights)
 	{
 		lightShader.Use();
 		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *light.GetObjectMatrix();
 		lightShader.SetMat4("transform", MVPMatrix);
 		lightShader.SetMat4("objectMatrix", *light.GetObjectMatrix());
-		lightShader.SetVec3("lightColor", glm::normalize(light.GetAmbient()));
+		lightShader.SetVec3("lightColor", light.GetDiffuse()); 
 		light.Draw(lightShader);
 	}
 
@@ -177,6 +244,18 @@ void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<L
 
 		gameObject.Draw(shader);
 	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDisable(GL_DEPTH_TEST);
+
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	textureShader.Use();
+
+	glBindVertexArray(quadVAO);
+	glBindTexture(GL_TEXTURE_2D, tcb);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 //This is supposed to print all sorts of general debug information.

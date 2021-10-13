@@ -70,16 +70,19 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="vertexShader.vert">
+    <None Include="shader.vert">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="textureShader.frag">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="colorShader.frag">
+    <None Include="shader.frag">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="lightShader.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="textureShader.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="textureShader.frag">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
