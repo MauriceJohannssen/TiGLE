@@ -1,6 +1,7 @@
 #version 330 core
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec4 brightColor;
 
 //Object
 in vec3 vNormal;
@@ -49,6 +50,13 @@ void main()
 		finalColor += CalcDirectionalLight(pointLights[i], normalize(vNormal), vFragPosition, cameraPosition - vFragPosition);
 	}
 	fragColor = vec4(finalColor,1);
+
+	//Check on brightness
+	float brightness = dot(finalColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+	if(brightness > 1.0)
+		brightColor = vec4(finalColor,1);
+	else
+		brightColor = vec4(0,0,0,1);
 }
 
 

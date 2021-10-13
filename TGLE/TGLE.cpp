@@ -20,7 +20,8 @@
 void DebugInformation();
 void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& viewMatrix,
 	const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader, unsigned int fb, Shader& textureShader,
-	unsigned int quadVAO, unsigned int tcb);
+	unsigned int quadVAO, unsigned int textureColorBuffers[], unsigned int swappingFramebuffers[]
+	, unsigned int swappingColorBuffers[], Shader& blurShader, Shader& bloomShader);
 
 float quadVertices[] = {
 	// positions   // texCoords
@@ -63,33 +64,68 @@ int main()
 
 	glEnable(GL_DEPTH_TEST);
 
+	//======================================================================================================================
+
 	//Create a framebuffer
 	unsigned int framebuffer;
 	glGenFramebuffers(1, &framebuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
 	//Create attachment for the framebuffer, which is a texture in this case, since it must be read from.
-	unsigned int textureColorbuffer;
-	glGenTextures(1, &textureColorbuffer);
-	glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 1600, 800, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	unsigned int textureColorbuffer[2];
+	glGenTextures(2, textureColorbuffer);
 
-	//No need to set mipmap option here.
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	for (int i = 0; i < 2; i++)
+	{
+		glBindTexture(GL_TEXTURE_2D, textureColorbuffer[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 1600, 900, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
-	//Bind to framebuffer
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+		//No need to set mipmap option here.
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		//Bind to framebuffer
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, textureColorbuffer[i], 0);
+	}
 
+	unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+	glDrawBuffers(2, attachments);
+
+	
 	//Create Renderbuffer object for depth (and potentially stencil) values.
 	unsigned int renderbuffer;
 	glGenRenderbuffers(1, &renderbuffer);
 	glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1600, 800);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1600, 900);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer);
 
 	//Unbind framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	//======================================================================================================================
+
+	//Create swapping framebuffers for Bloom
+	unsigned int swappingBuffers[2];
+	glGenFramebuffers(2, swappingBuffers);
+	
+	//Create two texture for the swapping frame buffers respectively.
+	unsigned int swappingColorBuffers[2];
+	glGenTextures(2, swappingColorBuffers);
+	for (int i = 0; i < 2; i++)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, swappingBuffers[i]);
+		glBindTexture(GL_TEXTURE_2D, swappingColorBuffers[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 1600, 900, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		//No need to set mipmap option here.
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, swappingColorBuffers[i], 0);
+	}
+
+	//======================================================================================================================
 
 	//Create quad to render texture
 	unsigned int quadVAO;
@@ -106,11 +142,18 @@ int main()
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(2 * sizeof(float)));
 	glBindVertexArray(0);
 
+	//======================================================================================================================
+
 	Shader colorShader("shader.vert", "shader.frag");
 	Shader lightShader("shader.vert", "lightShader.frag");
 	Shader textureShader("textureShader.vert", "textureShader.frag");
 	textureShader.Use();
 	textureShader.SetInt("screenTexture", 0);
+	Shader blurShader("textureShader.vert", "gaussianBlur.frag");
+	Shader bloomShader("textureShader.vert", "bloom.frag");
+	bloomShader.Use();
+	bloomShader.SetInt("hdrRender", 0);
+	bloomShader.SetInt("bloomRender", 1);
 
 	std::vector<GameObject> gameObjects;
 	std::vector<Light> lightSources;
@@ -121,17 +164,17 @@ int main()
 	gameObjects.push_back(gameObject1);
 
 	//Lights
-	Light light("light_1", Point, glm::vec3(0.96f, 0.05f, 0.87f), "Models/Cube/Cube.obj", 5);
+	Light light("light_1", Point, glm::vec3(0.96f, 0.05f, 0.87f), "Models/Cube/Cube.obj", 3);
 	light.SetPosition(glm::vec3(0.5f, 0.5f, 1));
 	light.Scale(glm::vec3(0.1));
 	lightSources.push_back(light);
 
-	Light light2("light_2", Point, glm::vec3(0.0f, 0.31f, 0.95f), "Models/Cube/Cube.obj", 7);
+	Light light2("light_2", Point, glm::vec3(0.0f, 0.31f, 0.95f), "Models/Cube/Cube.obj", 2);
 	light2.SetPosition(glm::vec3(0.5f, 0.5, -1));
 	light2.Scale(glm::vec3(0.1f));
 	lightSources.push_back(light2);
 
-	Light light3("light_3", Point, glm::vec3(0.24f, 0.95f, 0.13f), "Models/Cube/Cube.obj", 3);
+	Light light3("light_3", Point, glm::vec3(0.24f, 0.95f, 0.13f), "Models/Cube/Cube.obj", 1);
 	light3.SetPosition(glm::vec3(1, 0, 0));
 	light3.Scale(glm::vec3(0.1f));
 	lightSources.push_back(light3);
@@ -171,7 +214,7 @@ int main()
 
 		//Render
 		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), colorShader, lightShader, framebuffer, 
-			textureShader, quadVAO, textureColorbuffer);
+			textureShader, quadVAO, textureColorbuffer, swappingBuffers, swappingColorBuffers, blurShader, bloomShader);
 
 		//Swap Buffers
 		window.display();
@@ -184,7 +227,8 @@ int main()
 
 void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights,
 	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader, unsigned int fb,
-	Shader& textureShader, unsigned int quadVAO, unsigned int tcb)
+	Shader& textureShader, unsigned int quadVAO, unsigned int textureColorBuffers[], unsigned int swappingFramebuffers[]
+	,unsigned int swappingColorBuffers[], Shader& blurShader, Shader& bloomShader)
 {
 	//Bind off-screen framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, fb);
@@ -244,18 +288,44 @@ void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<L
 
 		gameObject.Draw(shader);
 	}
+
+	bool horizontal = true;
+	bool firstIteration = true;
+	int passes = 28;
+	blurShader.Use();
+	for (int i = 0; i < passes; i++)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, swappingFramebuffers[horizontal]);
+		blurShader.SetInt("horizontal", horizontal);
+		glBindTexture(GL_TEXTURE_2D, firstIteration ? textureColorBuffers[1] : swappingColorBuffers[!horizontal]);
+		
+		//Render quad
+		glBindVertexArray(quadVAO);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
+
+		horizontal = !horizontal;
+		if (firstIteration)
+		{
+			firstIteration = false;
+		}
+	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glDisable(GL_DEPTH_TEST);
 
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	textureShader.Use();
+	bloomShader.Use();
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, textureColorBuffers[0]);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, swappingColorBuffers[0]);
 
 	glBindVertexArray(quadVAO);
-	glBindTexture(GL_TEXTURE_2D, tcb);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 }
 
 //This is supposed to print all sorts of general debug information.

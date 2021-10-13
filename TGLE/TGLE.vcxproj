@@ -160,6 +160,8 @@
     <ClInclude Include="Shader.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="bloom.frag" />
+    <None Include="gaussianBlur.frag" />
     <None Include="lightShader.frag" />
     <None Include="shader.frag" />
     <None Include="textureShader.frag" />
