@@ -91,9 +91,9 @@ int main()
 	textureShader.SetInt("screenTexture", 0);
 	shaders["textureShader"] = textureShader;
 
-	shaders["blurShader"] = Shader("textureShader.vert", "gaussianBlur.frag");
+	shaders["blurShader"] = Shader("textureShader.vert", "gaussianBlurShader.frag");
 
-	Shader bloomShader("textureShader.vert", "bloom.frag");
+	Shader bloomShader("textureShader.vert", "bloomShader.frag");
 	bloomShader.Use();
 	bloomShader.SetInt("hdrRender", 0);
 	bloomShader.SetInt("bloomRender", 1);

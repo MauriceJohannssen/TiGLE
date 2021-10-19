@@ -85,10 +85,10 @@
     <None Include="textureShader.frag">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="gaussianBlur.frag">
+    <None Include="gaussianBlurShader.frag">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="bloom.frag">
+    <None Include="bloomShader.frag">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
