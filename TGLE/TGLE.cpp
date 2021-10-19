@@ -20,12 +20,13 @@ int windowWidth = 1600;
 int windowHeight = 900;
 
 void DebugInformation();
-void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], unsigned int& pRenderbuffer);
+void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], unsigned int& pRenderbuffer, unsigned int& pVertexPosition);
 void CreateBloomBuffers(unsigned int pFramebuffers[], unsigned int pColorbuffers[]);
 void CreateRenderQuad(unsigned int& pVAO);
 
 void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix,const glm::mat4& pProjectionMatrix, 
-	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[]);
+	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[], 
+	unsigned int& pVertexPositions);
 
 
 //These vertices are being used for the rendering quad used for HDR & Bloom.
@@ -70,9 +71,10 @@ int main()
 	//Setup buffers
 	unsigned int hdrFramebuffer;
 	unsigned int hdrColorbuffers[2];
+	unsigned int vertexPosition;
 	unsigned int hdrRenderbuffer;
 
-	CreateHDRBuffers(hdrFramebuffer, hdrColorbuffers, hdrRenderbuffer);
+	CreateHDRBuffers(hdrFramebuffer, hdrColorbuffers, hdrRenderbuffer, vertexPosition);
 
 	unsigned int bloomFramebuffers[2];
 	unsigned int bloomColorbuffers[2];
@@ -100,28 +102,36 @@ int main()
 
 	shaders["bloomShader"] = bloomShader;
 
+	Shader DoFShader("textureShader.vert", "DoFShader.frag");
+	DoFShader.Use();
+	DoFShader.SetInt("sharpTexture", 0);
+	DoFShader.SetInt("blurredTexture", 1);
+	DoFShader.SetInt("vertexPositions", 2);
+	shaders["dofShader"] = DoFShader;
+
 	std::vector<GameObject> gameObjects;
 	std::vector<Light> lightSources;
 
 	//GameObjects
 	GameObject gameObject1("Models/R99/R99.obj");
-	gameObject1.SetPosition(glm::vec3(0));
+	gameObject1.SetPosition(glm::vec3(-0.5f, -0.25f, 0));
+	gameObject1.Scale(glm::vec3(2));
 	gameObjects.push_back(gameObject1);
 
 	//Lights
 	Light light("light_1", Point, glm::vec3(0.96f, 0.05f, 0.87f), "Models/Cube/Cube.obj", 3);
 	light.SetPosition(glm::vec3(0.5f, 0.5f, 1));
-	light.Scale(glm::vec3(0.1));
+	light.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light);
 
 	Light light2("light_2", Point, glm::vec3(0.0f, 0.31f, 0.95f), "Models/Cube/Cube.obj", 2);
-	light2.SetPosition(glm::vec3(0.5f, 0.5, -1));
-	light2.Scale(glm::vec3(0.1f));
+	light2.SetPosition(glm::vec3(0.2f, 0.5, -1));
+	light2.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light2);
 
 	Light light3("light_3", Point, glm::vec3(0.24f, 0.95f, 0.13f), "Models/Cube/Cube.obj", 1);
 	light3.SetPosition(glm::vec3(1, 0, 0));
-	light3.Scale(glm::vec3(0.1f));
+	light3.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light3);
 
 	//Time
@@ -136,10 +146,6 @@ int main()
 
 	while (window.isOpen())
 	{
-		//Buffer Clearing
-		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 		//Update Time
 		deltaTime = clock.getElapsedTime().asSeconds() - lastFrame;
 		lastFrame = clock.getElapsedTime().asSeconds();
@@ -158,7 +164,7 @@ int main()
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
 
 		//Render
-		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO, hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers);
+		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO, hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers, vertexPosition);
 
 		//Swap Buffers
 		window.display();
@@ -170,7 +176,8 @@ int main()
 }
 
 void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
-	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[])
+	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[], 
+	unsigned int& pVertexPositions)
 {
 	//Bind off-screen framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, pHdrFramebuffer);
@@ -234,8 +241,12 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	//Render with swapping buffers to create bloom.
 	bool horizontal = true;
 	bool firstIteration = true;
-	int passes = 20;
+	int passes = 16;
 	pShaders["blurShader"].Use();
+
+	glBindVertexArray(pQuadVAO);
+	glDisable(GL_DEPTH_TEST);
+
 	for (int i = 0; i < passes; i++)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
@@ -243,8 +254,6 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 
 		//On first iteration bind the hdr colorbuffer, otherwise no starting texture is provided.
 		glBindTexture(GL_TEXTURE_2D, firstIteration ? pHdrColorbuffers[1] : pBloomColorbuffers[!horizontal]);
-		
-		glBindVertexArray(pQuadVAO);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 
 		horizontal = !horizontal;
@@ -254,11 +263,8 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 		}
 	}
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glDisable(GL_DEPTH_TEST);
-
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//1. Render sharp bloom image into framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, pHdrFramebuffer);
 
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	pShaders["bloomShader"].Use();
@@ -266,9 +272,43 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, pHdrColorbuffers[0]);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, pBloomColorbuffers[0]);
+	glBindTexture(GL_TEXTURE_2D, pBloomColorbuffers[horizontal]);
 
-	glBindVertexArray(pQuadVAO);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
+
+
+	//2. Blur whole image
+	pShaders["blurShader"].Use();
+	horizontal = true;
+	firstIteration = true;
+	passes = 6;
+
+	for (int i = 0; i < passes; i++)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
+		pShaders["blurShader"].SetInt("horizontal", horizontal);
+		
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, firstIteration ? pHdrColorbuffers[1] : pBloomColorbuffers[!horizontal]);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
+
+		horizontal = !horizontal;
+		if (firstIteration)
+		{
+			firstIteration = false;
+		}
+	}
+	
+	pShaders["dofShader"].Use();
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, pHdrColorbuffers[1]);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, pBloomColorbuffers[0]);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, pVertexPositions);
+
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 }
 
@@ -280,7 +320,7 @@ void DebugInformation()
 	std::cout << "Maximum number of vertex attributes is: " << nrAttributes << std::endl;
 }
 
-void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], unsigned int& pRenderbuffer)
+void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], unsigned int& pRenderbuffer, unsigned int& pVertexPosition)
 {
 	//Create a framebuffer
 	glGenFramebuffers(1, &pFramebuffer);
@@ -304,9 +344,21 @@ void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], 
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, pColorbuffers[i], 0);
 	}
 
+	//DOF======================================================================================================================
+	glGenTextures(1, &pVertexPosition);
+	glBindTexture(GL_TEXTURE_2D, pVertexPosition);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_FLOAT, nullptr);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	//Bind to framebuffer
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + 2, GL_TEXTURE_2D, pVertexPosition, 0);
+
 	//Sets framebuffer to render to two textures/outputs.
-	unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-	glDrawBuffers(2, attachments);
+	unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+	glDrawBuffers(3, attachments);
 
 
 	//Create Renderbuffer object for depth (and potentially stencil) values.

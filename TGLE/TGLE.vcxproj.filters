@@ -91,5 +91,8 @@
     <None Include="bloomShader.frag">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="DoFShader.frag">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

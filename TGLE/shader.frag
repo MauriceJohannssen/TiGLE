@@ -2,6 +2,7 @@
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec4 brightColor;
+layout(location = 2) out vec4 vertexPosition;
 
 //Object
 in vec3 vNormal;
@@ -57,6 +58,8 @@ void main()
 		brightColor = vec4(finalColor,1);
 	else
 		brightColor = vec4(0,0,0,1);
+
+	vertexPosition = vec4(vFragPosition,1);
 }
 
 

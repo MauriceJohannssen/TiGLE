@@ -1,16 +1,16 @@
 #version 330 core
 
 in vec2 vUVs;
-out vec4 fragColor;
+layout(location = 1) out vec4 fragColor;
 
 uniform sampler2D hdrRender;
 uniform sampler2D bloomRender;
 
 void main()
 {
-	const float gamma = 2.0;
+	const float gamma = 2.2;
     //This will be a uniform
-    const float exposure = 0.5;
+    const float exposure = 0.3;
     vec3 colorHDR = texture(hdrRender, vUVs).rgb;
     vec3 bloomHDR = texture(bloomRender, vUVs).rgb;
     colorHDR += bloomHDR;
