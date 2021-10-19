@@ -12,9 +12,18 @@ Camera::Camera(ProjectionType pProjection) : movementVector(glm::vec3(0))
 	}
 }
 
-
 glm::mat4 Camera::GetProjectionMatrix() const
 {
 	return projectionMatrix;
+}
+
+glm::vec3 Camera::GetMovementVector() const
+{
+	return movementVector;
+}
+
+void Camera::SetMovementVector(const glm::vec3 pVector)
+{
+	movementVector = pVector;
 }
 

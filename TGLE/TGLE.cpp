@@ -1,11 +1,9 @@
 #pragma once
-
 #include "glad/glad.h"
 #include <SFML/Window.hpp>
 #include <SFML/Graphics/Image.hpp>
 #include <iostream>
 #include <stb_image.h>
-
 #include "Input.h"
 #include "Material.h"
 #include "Shader.h"
@@ -15,16 +13,23 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Camera.h"
 #include <vector>
+#include <map>
 #include "Light.h"
 
-void DebugInformation();
-void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& viewMatrix,
-	const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader, unsigned int fb, Shader& textureShader,
-	unsigned int quadVAO, unsigned int textureColorBuffers[], unsigned int swappingFramebuffers[]
-	, unsigned int swappingColorBuffers[], Shader& blurShader, Shader& bloomShader);
+int windowWidth = 1600;
+int windowHeight = 900;
 
+void DebugInformation();
+void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], unsigned int& pRenderbuffer);
+void CreateBloomBuffers(unsigned int pFramebuffers[], unsigned int pColorbuffers[]);
+void CreateRenderQuad(unsigned int& pVAO);
+
+void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix,const glm::mat4& pProjectionMatrix, 
+	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[]);
+
+
+//These vertices are being used for the rendering quad used for HDR & Bloom.
 float quadVertices[] = {
-	// positions   // texCoords
 	-1.0f,  1.0f,  0.0f, 1.0f,
 	-1.0f, -1.0f,  0.0f, 0.0f,
 	 1.0f, -1.0f,  1.0f, 0.0f,
@@ -43,7 +48,7 @@ int main()
 	settings.majorVersion = 3;
 	settings.minorVersion = 3;
 
-	sf::Window window(sf::VideoMode(1600, 900), "TiGLE", sf::Style::Default, settings);
+	sf::Window window(sf::VideoMode(windowWidth, windowHeight), "TiGLE", sf::Style::Default, settings);
 	window.setVerticalSyncEnabled(true);
 	window.setActive(true);
 
@@ -60,100 +65,40 @@ int main()
 
 	DebugInformation();
 
-	glViewport(0, 0, 1600, 900);
+	glViewport(0, 0, windowWidth, windowHeight);
 
-	glEnable(GL_DEPTH_TEST);
+	//Setup buffers
+	unsigned int hdrFramebuffer;
+	unsigned int hdrColorbuffers[2];
+	unsigned int hdrRenderbuffer;
 
-	//======================================================================================================================
+	CreateHDRBuffers(hdrFramebuffer, hdrColorbuffers, hdrRenderbuffer);
 
-	//Create a framebuffer
-	unsigned int framebuffer;
-	glGenFramebuffers(1, &framebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	unsigned int bloomFramebuffers[2];
+	unsigned int bloomColorbuffers[2];
+	CreateBloomBuffers(bloomFramebuffers, bloomColorbuffers);
 
-	//Create attachment for the framebuffer, which is a texture in this case, since it must be read from.
-	unsigned int textureColorbuffer[2];
-	glGenTextures(2, textureColorbuffer);
-
-	for (int i = 0; i < 2; i++)
-	{
-		glBindTexture(GL_TEXTURE_2D, textureColorbuffer[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 1600, 900, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-		//No need to set mipmap option here.
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		//Bind to framebuffer
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, textureColorbuffer[i], 0);
-	}
-
-	unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-	glDrawBuffers(2, attachments);
-
-	
-	//Create Renderbuffer object for depth (and potentially stencil) values.
-	unsigned int renderbuffer;
-	glGenRenderbuffers(1, &renderbuffer);
-	glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1600, 900);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer);
-
-	//Unbind framebuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	//======================================================================================================================
-
-	//Create swapping framebuffers for Bloom
-	unsigned int swappingBuffers[2];
-	glGenFramebuffers(2, swappingBuffers);
-	
-	//Create two texture for the swapping frame buffers respectively.
-	unsigned int swappingColorBuffers[2];
-	glGenTextures(2, swappingColorBuffers);
-	for (int i = 0; i < 2; i++)
-	{
-		glBindFramebuffer(GL_FRAMEBUFFER, swappingBuffers[i]);
-		glBindTexture(GL_TEXTURE_2D, swappingColorBuffers[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 1600, 900, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-		//No need to set mipmap option here.
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, swappingColorBuffers[i], 0);
-	}
-
-	//======================================================================================================================
-
-	//Create quad to render texture
 	unsigned int quadVAO;
-	glGenVertexArrays(1, &quadVAO);
-	glBindVertexArray(quadVAO);
-	
-	unsigned int quadVBO;
-	glGenBuffers(1, &quadVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(0));
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(2 * sizeof(float)));
-	glBindVertexArray(0);
+	CreateRenderQuad(quadVAO);
 
-	//======================================================================================================================
+	//Setup shaders
+	std::map<std::string, Shader> shaders;
+	shaders["colorShader"] = Shader("shader.vert", "shader.frag");
+	shaders["lightShader"] = Shader("shader.vert", "lightShader.frag");
 
-	Shader colorShader("shader.vert", "shader.frag");
-	Shader lightShader("shader.vert", "lightShader.frag");
 	Shader textureShader("textureShader.vert", "textureShader.frag");
 	textureShader.Use();
 	textureShader.SetInt("screenTexture", 0);
-	Shader blurShader("textureShader.vert", "gaussianBlur.frag");
+	shaders["textureShader"] = textureShader;
+
+	shaders["blurShader"] = Shader("textureShader.vert", "gaussianBlur.frag");
+
 	Shader bloomShader("textureShader.vert", "bloom.frag");
 	bloomShader.Use();
 	bloomShader.SetInt("hdrRender", 0);
 	bloomShader.SetInt("bloomRender", 1);
+
+	shaders["bloomShader"] = bloomShader;
 
 	std::vector<GameObject> gameObjects;
 	std::vector<Light> lightSources;
@@ -203,18 +148,17 @@ int main()
 		HandleInput(&window, &mainCamera, deltaTime);
 
 		//Camera movement
-		if (mainCamera.movementVector.length() > 0.01f)
+		if (mainCamera.GetMovementVector().length() > 0.01f)
 		{
-			mainCamera.Translate(mainCamera.movementVector * 0.8f * deltaTime);
-			mainCamera.movementVector *= 0.9f;
+			mainCamera.Translate(mainCamera.GetMovementVector() * 0.8f * deltaTime);
+			mainCamera.SetMovementVector(mainCamera.GetMovementVector() * 0.9f);
 		}
 
 		//Update View Matrix
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
 
 		//Render
-		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), colorShader, lightShader, framebuffer, 
-			textureShader, quadVAO, textureColorbuffer, swappingBuffers, swappingColorBuffers, blurShader, bloomShader);
+		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO, hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers);
 
 		//Swap Buffers
 		window.display();
@@ -225,13 +169,11 @@ int main()
 	return 0;
 }
 
-void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights,
-	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, Shader& shader, Shader& lightShader, unsigned int fb,
-	Shader& textureShader, unsigned int quadVAO, unsigned int textureColorBuffers[], unsigned int swappingFramebuffers[]
-	,unsigned int swappingColorBuffers[], Shader& blurShader, Shader& bloomShader)
+void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
+	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[])
 {
 	//Bind off-screen framebuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, fb);
+	glBindFramebuffer(GL_FRAMEBUFFER, pHdrFramebuffer);
 	glEnable(GL_DEPTH_TEST);
 
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -239,68 +181,70 @@ void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<L
 
 	for (Light& light : pLights)
 	{
-		lightShader.Use();
-		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *light.GetObjectMatrix();
-		lightShader.SetMat4("transform", MVPMatrix);
-		lightShader.SetMat4("objectMatrix", *light.GetObjectMatrix());
-		lightShader.SetVec3("lightColor", light.GetDiffuse()); 
-		light.Draw(lightShader);
+		pShaders["lightShader"].Use();
+		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * *light.GetObjectMatrix();
+		pShaders["lightShader"].SetMat4("transform", MVPMatrix);
+		pShaders["lightShader"].SetMat4("objectMatrix", *light.GetObjectMatrix());
+		pShaders["lightShader"].SetVec3("lightColor", light.GetDiffuse());
+		light.Draw(pShaders["lightShader"]);
 	}
 
 
 	for (GameObject& gameObject : pGameObjects)
 	{
-		shader.Use();
-		const glm::mat4 MVPMatrix = projectionMatrix * viewMatrix * *gameObject.GetObjectMatrix();
-		shader.SetMat4("transform", MVPMatrix);
-		shader.SetMat4("objectMatrix", *gameObject.GetObjectMatrix());
-		shader.SetVec3("cameraPosition", camera.GetPosition());
+		pShaders["colorShader"].Use();
+		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * *gameObject.GetObjectMatrix();
+		pShaders["colorShader"].SetMat4("transform", MVPMatrix);
+		pShaders["colorShader"].SetMat4("objectMatrix", *gameObject.GetObjectMatrix());
+		pShaders["colorShader"].SetVec3("cameraPosition", pCamera.GetPosition());
 
 		//This is inefficient and just for testing purposes!
 		//Use uniform buffer objects or classes.
 
 		Light light = pLights.at(0);
-		shader.SetVec3("pointLights[0].position", light.GetPosition());
-		shader.SetVec3("pointLights[0].ambient", light.GetAmbient());
-		shader.SetVec3("pointLights[0].diffuse", light.GetDiffuse());
-		shader.SetVec3("pointLights[0].specular", light.GetSpecular());
-		shader.SetFloat("pointLights[0].constant", 1.0f);
-		shader.SetFloat("pointLights[0].linear", 0.07f);
-		shader.SetFloat("pointLights[0].quadratic", 0.3f);
+		pShaders["colorShader"].SetVec3("pointLights[0].position", light.GetPosition());
+		pShaders["colorShader"].SetVec3("pointLights[0].ambient", light.GetAmbient());
+		pShaders["colorShader"].SetVec3("pointLights[0].diffuse", light.GetDiffuse());
+		pShaders["colorShader"].SetVec3("pointLights[0].specular", light.GetSpecular());
+		pShaders["colorShader"].SetFloat("pointLights[0].constant", 1.0f);
+		pShaders["colorShader"].SetFloat("pointLights[0].linear", 0.07f);
+		pShaders["colorShader"].SetFloat("pointLights[0].quadratic", 0.3f);
 
 		light = pLights.at(1);
-		shader.SetVec3("pointLights[1].position", light.GetPosition());
-		shader.SetVec3("pointLights[1].ambient", light.GetAmbient());
-		shader.SetVec3("pointLights[1].diffuse", light.GetDiffuse());
-		shader.SetVec3("pointLights[1].specular", light.GetSpecular());
-		shader.SetFloat("pointLights[1].constant", 1.0f);
-		shader.SetFloat("pointLights[1].linear", 0.07f);
-		shader.SetFloat("pointLights[1].quadratic", 0.3f);
+		pShaders["colorShader"].SetVec3("pointLights[1].position", light.GetPosition());
+		pShaders["colorShader"].SetVec3("pointLights[1].ambient", light.GetAmbient());
+		pShaders["colorShader"].SetVec3("pointLights[1].diffuse", light.GetDiffuse());
+		pShaders["colorShader"].SetVec3("pointLights[1].specular", light.GetSpecular());
+		pShaders["colorShader"].SetFloat("pointLights[1].constant", 1.0f);
+		pShaders["colorShader"].SetFloat("pointLights[1].linear", 0.07f);
+		pShaders["colorShader"].SetFloat("pointLights[1].quadratic", 0.3f);
 
 		light = pLights.at(2);
-		shader.SetVec3("pointLights[2].position", light.GetPosition());
-		shader.SetVec3("pointLights[2].ambient", light.GetAmbient());
-		shader.SetVec3("pointLights[2].diffuse", light.GetDiffuse());
-		shader.SetVec3("pointLights[2].specular", light.GetSpecular());
-		shader.SetFloat("pointLights[2].constant", 1.0f);
-		shader.SetFloat("pointLights[2].linear", 0.07f);
-		shader.SetFloat("pointLights[2].quadratic", 0.3f);
+		pShaders["colorShader"].SetVec3("pointLights[2].position", light.GetPosition());
+		pShaders["colorShader"].SetVec3("pointLights[2].ambient", light.GetAmbient());
+		pShaders["colorShader"].SetVec3("pointLights[2].diffuse", light.GetDiffuse());
+		pShaders["colorShader"].SetVec3("pointLights[2].specular", light.GetSpecular());
+		pShaders["colorShader"].SetFloat("pointLights[2].constant", 1.0f);
+		pShaders["colorShader"].SetFloat("pointLights[2].linear", 0.07f);
+		pShaders["colorShader"].SetFloat("pointLights[2].quadratic", 0.3f);
 
-		gameObject.Draw(shader);
+		gameObject.Draw(pShaders["colorShader"]);
 	}
 
+	//Render with swapping buffers to create bloom.
 	bool horizontal = true;
 	bool firstIteration = true;
-	int passes = 28;
-	blurShader.Use();
+	int passes = 20;
+	pShaders["blurShader"].Use();
 	for (int i = 0; i < passes; i++)
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, swappingFramebuffers[horizontal]);
-		blurShader.SetInt("horizontal", horizontal);
-		glBindTexture(GL_TEXTURE_2D, firstIteration ? textureColorBuffers[1] : swappingColorBuffers[!horizontal]);
+		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
+		pShaders["blurShader"].SetInt("horizontal", horizontal);
+
+		//On first iteration bind the hdr colorbuffer, otherwise no starting texture is provided.
+		glBindTexture(GL_TEXTURE_2D, firstIteration ? pHdrColorbuffers[1] : pBloomColorbuffers[!horizontal]);
 		
-		//Render quad
-		glBindVertexArray(quadVAO);
+		glBindVertexArray(pQuadVAO);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 
 		horizontal = !horizontal;
@@ -313,18 +257,18 @@ void Render(Camera& camera, std::vector<GameObject>& pGameObjects, std::vector<L
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glDisable(GL_DEPTH_TEST);
 
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	bloomShader.Use();
+	pShaders["bloomShader"].Use();
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, textureColorBuffers[0]);
+	glBindTexture(GL_TEXTURE_2D, pHdrColorbuffers[0]);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, swappingColorBuffers[0]);
+	glBindTexture(GL_TEXTURE_2D, pBloomColorbuffers[0]);
 
-	glBindVertexArray(quadVAO);
+	glBindVertexArray(pQuadVAO);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 }
 
@@ -334,4 +278,83 @@ void DebugInformation()
 	int nrAttributes;
 	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nrAttributes);
 	std::cout << "Maximum number of vertex attributes is: " << nrAttributes << std::endl;
+}
+
+void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], unsigned int& pRenderbuffer)
+{
+	//Create a framebuffer
+	glGenFramebuffers(1, &pFramebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, pFramebuffer);
+
+	//Create attachment for the framebuffer, which is a texture in this case, since it must be read from, otherwise a renderbuffer would be better.
+	glGenTextures(2, pColorbuffers);
+
+	for (int i = 0; i < 2; i++)
+	{
+		glBindTexture(GL_TEXTURE_2D, pColorbuffers[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+		//No need to set mipmap option here.
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		
+		//Bind to framebuffer
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, pColorbuffers[i], 0);
+	}
+
+	//Sets framebuffer to render to two textures/outputs.
+	unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+	glDrawBuffers(2, attachments);
+
+
+	//Create Renderbuffer object for depth (and potentially stencil) values.
+	glGenRenderbuffers(1, &pRenderbuffer);
+	glBindRenderbuffer(GL_RENDERBUFFER, pRenderbuffer);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, windowWidth, windowHeight);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, pRenderbuffer);
+
+	//Unbind framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void CreateBloomBuffers(unsigned int pSwappingFramebuffers[], unsigned int pSwappingColorbuffers[])
+{
+	glGenFramebuffers(2, pSwappingFramebuffers);
+
+	//Create two texture for the swapping frame buffers respectively.
+	glGenTextures(2, pSwappingColorbuffers);
+	for (int i = 0; i < 2; i++)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, pSwappingFramebuffers[i]);
+		glBindTexture(GL_TEXTURE_2D, pSwappingColorbuffers[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		
+		//No need to set mipmap option here.
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		
+		//Bind to framebuffer
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pSwappingColorbuffers[i], 0);
+	}
+}
+
+void CreateRenderQuad(unsigned int& pVAO)
+{
+	//Create quad to render texture
+	glGenVertexArrays(1, &pVAO);
+	glBindVertexArray(pVAO);
+
+	unsigned int pVBO;
+	glGenBuffers(1, &pVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, pVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(0));
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(2 * sizeof(float)));
+	glBindVertexArray(0);
 }

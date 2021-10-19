@@ -1,5 +1,3 @@
-#pragma once
-
 #ifndef SHADER_H
 #define SHADER_H
 
@@ -15,7 +13,11 @@ class Shader
 {
 public:
 	Shader(const char* vertexPath, const char* fragmentPath); 
+	Shader();
+	Shader(const Shader& pShader);
+
 	unsigned int ID;
+
 	void Use() const;
 	void SetBool(const std::string &name, bool value) const;
 	void SetInt(const std::string &name, int value) const;

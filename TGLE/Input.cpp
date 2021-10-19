@@ -25,16 +25,16 @@ void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
 			switch(event.key.code)
 			{
 			case sf::Keyboard::W:
-				pCamera->movementVector += pCamera->GetForward();
+				pCamera->SetMovementVector(pCamera->GetMovementVector() + pCamera->GetForward());
 				break;
 			case sf::Keyboard::S:
-				pCamera->movementVector -= pCamera->GetForward();
+				pCamera->SetMovementVector(pCamera->GetMovementVector() - pCamera->GetForward());
 				break;
 			case sf::Keyboard::A:
-				pCamera->movementVector -= glm::normalize(glm::cross(pCamera->GetForward(), pCamera->GetUp()));
+				pCamera->SetMovementVector(pCamera->GetMovementVector() - glm::normalize(glm::cross(pCamera->GetForward(), pCamera->GetUp())));
 				break;
 			case sf::Keyboard::D:
-				pCamera->movementVector += glm::normalize(glm::cross(pCamera->GetForward(), pCamera->GetUp()));
+				pCamera->SetMovementVector(pCamera->GetMovementVector() + glm::normalize(glm::cross(pCamera->GetForward(), pCamera->GetUp())));
 				break;
 			case sf::Keyboard::Escape:
 				pWindow->close();

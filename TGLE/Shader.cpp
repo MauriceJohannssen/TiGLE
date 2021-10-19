@@ -53,6 +53,14 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath)
 	glDeleteShader(fragmentShader);
 }
 
+Shader::Shader() : ID(0)
+{
+	std::cout << "Warning: Default shader was created, this has ID = 0!" << std::endl;
+}
+
+Shader::Shader(const Shader& pShader) : ID(pShader.ID)
+{ }
+
 void Shader::Use() const
 {
 	glUseProgram(ID);
