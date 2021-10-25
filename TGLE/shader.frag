@@ -74,8 +74,9 @@ vec3 CalcDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPositio
 	vec3 lightDirection = normalize(pointLight.position - vFragPosition);
 	vec3 diffuse = max(dot(pNormal, lightDirection), 0.0) * vec3(texture(material.texture_diffuse1, vUVs)) * pointLight.diffuse;
 	//Specular
-	vec3 reflectedLightDirection = reflect(-lightDirection, pNormal);
-	float finalSpecular = pow(max(dot(pViewDirection, reflectedLightDirection),0.0), 32);
+	//vec3 reflectedLightDirection = reflect(-lightDirection, pNormal);
+	vec3 halfwayDirection = normalize(lightDirection + pViewDirection);
+	float finalSpecular = pow(max(dot(pNormal, halfwayDirection),0.0), 32);
 	vec3 specular = (finalSpecular * vec3(texture(material.texture_specular1, vUVs))) * pointLight.specular;
 	//Attenuation
 	float distanceLightFrag = length(pointLight.position - vFragPosition);
