@@ -119,17 +119,17 @@ int main()
 	gameObjects.push_back(gameObject1);
 
 	//Lights
-	Light light("light_1", Point, glm::vec3(0.96f, 0.05f, 0.87f), "Models/Cube/Cube.obj", 3);
+	Light light("light_1", Point, glm::vec3(0.96f, 0.05f, 0.87f), "Models/Cube/Cube.obj", 2);
 	light.SetPosition(glm::vec3(0.5f, 0.5f, 1));
 	light.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light);
 
-	Light light2("light_2", Point, glm::vec3(0.0f, 0.31f, 0.95f), "Models/Cube/Cube.obj", 2);
+	Light light2("light_2", Point, glm::vec3(0.0f, 0.31f, 0.95f), "Models/Cube/Cube.obj", 3);
 	light2.SetPosition(glm::vec3(0.2f, 0.5, -1));
 	light2.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light2);
 
-	Light light3("light_3", Point, glm::vec3(0.24f, 0.95f, 0.13f), "Models/Cube/Cube.obj", 1);
+	Light light3("light_3", Point, glm::vec3(0.34f, 0.95f, 0.13f), "Models/Cube/Cube.obj", 2);
 	light3.SetPosition(glm::vec3(1, 0, 0));
 	light3.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light3);

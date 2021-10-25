@@ -54,7 +54,9 @@ void main()
 
 	//Check on brightness
 	float brightness = dot(finalColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-	if(brightness > 1.0)
+
+	//This value determines what will be "considered" bloom.
+	if(brightness > 1.3)
 		brightColor = vec4(finalColor,1);
 	else
 		brightColor = vec4(0,0,0,1);
