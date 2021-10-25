@@ -3,6 +3,7 @@
 #### The project and wiki is work in progress.
 ##### Currently features:
 - Model loading
+- Blinn-Phong Lighting
 - Multiple lights
 - Bloom
 - Depth of Field
