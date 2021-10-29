@@ -10,7 +10,7 @@ in vec2 vUVs;
 
 void main()
 {
-	vec2 nearFar = vec2(0.5, 2.0);
+	vec2 nearFar = vec2(0.5, 1.5);
 	
 	//Sample both sharp and blurred textures
 	vec4 focusColor = texture(sharpTexture, vUVs);
