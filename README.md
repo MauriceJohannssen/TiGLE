@@ -5,6 +5,7 @@
 - Model loading
 - Blinn-Phong Lighting
 - Multiple lights
+- HDR
 - Bloom
 - Depth of Field
 ##### Next features:
