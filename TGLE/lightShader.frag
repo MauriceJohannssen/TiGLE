@@ -1,9 +1,19 @@
 #version 330 core
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec4 brightColor;
 uniform vec3 lightColor;
+uniform float intensity;
+uniform float bloomThreshold;
 
 void main()
 {
-	fragColor = vec4(lightColor,1) * 2;
+	vec3 light = lightColor * intensity;
+	fragColor = vec4(light, 1);
+	if(dot(light, vec3(0.2126, 0.7152, 0.0722)) > bloomThreshold){
+		brightColor = vec4(light, 1);
+	}
+	else{
+	brightColor = vec4(0,0,0,1);
+	}
 }

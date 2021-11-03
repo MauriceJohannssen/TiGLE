@@ -24,14 +24,29 @@
 int windowWidth = 1600;
 int windowHeight = 900;
 
+struct Bloom {
+	float threshold;
+	int passes;
+};
+
+struct DepthOfField {
+	float aperture;
+	float imageDistance;
+	float focalLength;
+	float planeInFocus;
+	float near;
+	float far;
+};
+
 void DebugInformation();
 void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], unsigned int& pRenderbuffer, unsigned int& pVertexPosition);
 void CreateBloomBuffers(unsigned int pFramebuffers[], unsigned int pColorbuffers[]);
 void CreateRenderQuad(unsigned int& pVAO);
+void LightGui(Light& pLight);
 
 void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix,const glm::mat4& pProjectionMatrix, 
 	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[], 
-	unsigned int& pVertexPositions);
+	unsigned int& pVertexPositions, Bloom& pBloom);
 
 
 //These vertices are being used for the rendering quad used for HDR & Bloom.
@@ -126,18 +141,23 @@ int main()
 	gameObject1.Scale(glm::vec3(2));
 	gameObjects.push_back(gameObject1);
 
+	GameObject gameObject2("Models/R99/R99.obj");
+	gameObject2.SetPosition(glm::vec3(-1.0f, -0.45f, -0.5));
+	gameObject2.Scale(glm::vec3(2));
+	gameObjects.push_back(gameObject2);
+
 	//Lights
-	Light light("light_1", Point, glm::vec3(0.96f, 0.05f, 0.87f), "Models/Cube/Cube.obj", 3);
+	Light light("light_1", Point, glm::vec3(1, 0, 0), "Models/Cube/Cube.obj", 3);
 	light.SetPosition(glm::vec3(0.5f, 0.5f, 1));
 	light.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light);
 
-	Light light2("light_2", Point, glm::vec3(0.0f, 0.31f, 0.95f), "Models/Cube/Cube.obj", 3);
+	Light light2("light_2", Point, glm::vec3(0, 1, 0), "Models/Cube/Cube.obj", 3);
 	light2.SetPosition(glm::vec3(0.2f, 0.5, -1));
 	light2.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light2);
 
-	Light light3("light_3", Point, glm::vec3(0.34f, 0.95f, 0.13f), "Models/Cube/Cube.obj", 2);
+	Light light3("light_3", Point, glm::vec3(0, 0, 1), "Models/Cube/Cube.obj", 2);
 	light3.SetPosition(glm::vec3(1, 0, 0));
 	light3.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light3);
@@ -152,21 +172,24 @@ int main()
 	mainCamera.SetPosition(glm::vec3(0, 0, 3));
 	mainCamera.SetForward(glm::vec3(0, 0, -1));
 
-	struct DepthOfField {
-		float aperture;
-		float imageDistance;
-		float focalLength;
-		float planeInFocus;
-	};
+	Bloom bloom;
+	bloom.threshold = 1.6f;
+	bloom.passes = 10;
 
 	DepthOfField DoF;
 	DoF.aperture = 1.f;
 	DoF.imageDistance = 1.f;
 	DoF.focalLength = 0.6f;
 	DoF.planeInFocus = 1.5f;
+	DoF.near = 0.1f;
+	DoF.far = 2;
+
 
 	//GUI variables
 	bool static showCreditsActive = false;
+	bool static showDoFSettings = false;
+	bool static showBloomSettings = false;
+	bool static showLightingSettings = false;
 
 	while (window.isOpen())
 	{
@@ -188,53 +211,95 @@ int main()
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
 
 		//Render
-		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO, hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers, vertexPosition);
+		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO, 
+			hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers, vertexPosition, bloom);
 
 		window.pushGLStates();
 
 		//Imgui
 		ImGui::SFML::Update(window, deltaTime);
-		
-		//Depth of Field settings
-		ImGui::Begin("Depth of Field Settings");
-		ImGui::SliderFloat("Aperture", &DoF.aperture, 0.0f, 1.0f);
-		ImGui::SliderFloat("Image Distance", &DoF.imageDistance, -6.0f, 10.0f);
-		ImGui::SliderFloat("Focal Length", &DoF.focalLength, 0.0f, 10.0f);
-		ImGui::SliderFloat("Plane in Focus", &DoF.planeInFocus, 0.0f, 10.0f);
-		ImGui::End();
-
-		shaders["dofShader"].Use();
-		shaders["dofShader"].SetFloat("aperture", DoF.aperture);
-		shaders["dofShader"].SetFloat("imageDistance", DoF.imageDistance);
-		shaders["dofShader"].SetFloat("focalLength", DoF.focalLength);
-		shaders["dofShader"].SetFloat("planeInFocus", DoF.planeInFocus);
-
-	
 
 		//Menu bar
 		ImGui::BeginMainMenuBar();
 		if (ImGui::BeginMenu("File")) 
 		{
-			if (ImGui::MenuItem("Open...")) 
+			if (ImGui::MenuItem("Open")) 
 			{
 				//Import file
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("About")) 
+		if (ImGui::BeginMenu("Lighting"))
 		{
-			if (ImGui::MenuItem("Credits")) 
+			if (ImGui::MenuItem("Edit lights"))
+				showLightingSettings = true;
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Post Processing"))
+		{
+			if (ImGui::MenuItem("Depth Of Field"))
+				showDoFSettings = true;
+			if (ImGui::MenuItem("Bloom"))
+				showBloomSettings = true;
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("About"))
+		{
+			if (ImGui::MenuItem("Credits"))
 				showCreditsActive = true;
 			ImGui::EndMenu();
 		}
 		ImGui::EndMainMenuBar();
 
+		if (showLightingSettings) {
+			ImGui::Begin("Lighting settings", &showLightingSettings);
+			if (ImGui::TreeNode("Light 1")) {
+				LightGui(lightSources.at(0));
+				ImGui::TreePop();
+			}
+			if (ImGui::TreeNode("Light 2")) {
+				LightGui(lightSources.at(1));
+				ImGui::TreePop();
+			}
+			if (ImGui::TreeNode("Light 3")) {
+				LightGui(lightSources.at(2));
+				ImGui::TreePop();
+			}
+		}
+
+		if (showDoFSettings)
+		{
+			//Depth of Field settings
+			ImGui::Begin("Depth of Field Settings", &showDoFSettings);
+			ImGui::SliderFloat("Aperture", &DoF.aperture, 0.0f, 1.0f);
+			ImGui::SliderFloat("Image Distance", &DoF.imageDistance, 0.0f, 20.0f);
+			ImGui::SliderFloat("Focal Length", &DoF.focalLength, 0.0f, 2.0f);
+			ImGui::SliderFloat("Plane in Focus", &DoF.planeInFocus, 0.0f, 20.0f);
+			ImGui::SliderFloat("Near", &DoF.near, 0.0f, 20.0f);
+			ImGui::SliderFloat("Far", &DoF.far, 0.0f, 20.0f);
+			ImGui::End();
+		}
+		if (showBloomSettings)
+		{
+			ImGui::Begin("Bloom settings", &showBloomSettings);
+			ImGui::SliderFloat("Threshold", &bloom.threshold, 0.0f, 10.0f);
+			ImGui::SliderInt("Passes", &bloom.passes, 2, 20);
+			ImGui::End();
+		}
 		if (showCreditsActive)
 		{
 			ImGui::Begin("Credits", &showCreditsActive);
 			ImGui::Text("Developed by Maurice Johannssen @ Saxion UAS");
 			ImGui::End();
 		}
+
+		shaders["dofShader"].Use();
+		shaders["dofShader"].SetFloat("aperture", DoF.aperture);
+		shaders["dofShader"].SetFloat("imageDistance", DoF.imageDistance);
+		shaders["dofShader"].SetFloat("focalLength", DoF.focalLength);
+		shaders["dofShader"].SetFloat("planeInFocus", DoF.planeInFocus);
+		shaders["dofShader"].SetFloat("near", DoF.near);
+		shaders["dofShader"].SetFloat("far", DoF.far);
 		
 		//Render GUI
 		ImGui::SFML::Render(window);
@@ -254,9 +319,32 @@ int main()
 	return 0;
 }
 
+void LightGui(Light& pLight) {
+	glm::vec3 vec = pLight.GetPosition();
+	if (ImGui::DragFloat3("Position", glm::value_ptr(vec), 0.05f)) {
+		pLight.SetPosition(vec);
+	}
+	glm::vec3 light = pLight.GetAmbient();
+	if (ImGui::ColorEdit3("Ambient", glm::value_ptr(light))){
+		pLight.SetAmbient(light);
+	}
+	light = pLight.GetDiffuse();
+	if (ImGui::ColorEdit3("Diffuse", glm::value_ptr(light))) {
+		pLight.SetDiffuse(light);
+	}
+	light = pLight.GetSpecular();
+	if (ImGui::ColorEdit3("Specular", glm::value_ptr(light))) {
+		pLight.SetSpecular(light);
+	}
+	float intensity = pLight.GetIntensity();
+	if (ImGui::SliderFloat("Intensity", &intensity, 0.0f, 50.0f)) {
+		pLight.SetIntensity(intensity);
+	}
+}
+
 void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
 	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[], 
-	unsigned int& pVertexPositions)
+	unsigned int& pVertexPositions, Bloom& pBloom)
 {
 	//Bind off-screen framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, pHdrFramebuffer);
@@ -272,6 +360,9 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 		pShaders["lightShader"].SetMat4("transform", MVPMatrix);
 		pShaders["lightShader"].SetMat4("objectMatrix", *light.GetObjectMatrix());
 		pShaders["lightShader"].SetVec3("lightColor", light.GetDiffuse());
+		pShaders["lightShader"].SetFloat("intensity", light.GetIntensity());
+		//Bloom threshold
+		pShaders["lightShader"].SetFloat("bloomThreshold", pBloom.threshold);
 		light.Draw(pShaders["lightShader"]);
 	}
 
@@ -283,50 +374,40 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 		pShaders["colorShader"].SetMat4("transform", MVPMatrix);
 		pShaders["colorShader"].SetMat4("objectMatrix", *gameObject.GetObjectMatrix());
 		pShaders["colorShader"].SetVec3("cameraPosition", pCamera.GetPosition());
+		
+		//Bloom threshold
+		pShaders["colorShader"].SetFloat("bloomThreshold", pBloom.threshold);
 
 		//This is inefficient and just for testing purposes!
 		//Use uniform buffer objects or classes.
 
-		Light light = pLights.at(0);
-		pShaders["colorShader"].SetVec3("pointLights[0].position", light.GetPosition());
-		pShaders["colorShader"].SetVec3("pointLights[0].ambient", light.GetAmbient());
-		pShaders["colorShader"].SetVec3("pointLights[0].diffuse", light.GetDiffuse());
-		pShaders["colorShader"].SetVec3("pointLights[0].specular", light.GetSpecular());
-		pShaders["colorShader"].SetFloat("pointLights[0].constant", 1.0f);
-		pShaders["colorShader"].SetFloat("pointLights[0].linear", 0.07f);
-		pShaders["colorShader"].SetFloat("pointLights[0].quadratic", 0.3f);
-
-		light = pLights.at(1);
-		pShaders["colorShader"].SetVec3("pointLights[1].position", light.GetPosition());
-		pShaders["colorShader"].SetVec3("pointLights[1].ambient", light.GetAmbient());
-		pShaders["colorShader"].SetVec3("pointLights[1].diffuse", light.GetDiffuse());
-		pShaders["colorShader"].SetVec3("pointLights[1].specular", light.GetSpecular());
-		pShaders["colorShader"].SetFloat("pointLights[1].constant", 1.0f);
-		pShaders["colorShader"].SetFloat("pointLights[1].linear", 0.07f);
-		pShaders["colorShader"].SetFloat("pointLights[1].quadratic", 0.3f);
-
-		light = pLights.at(2);
-		pShaders["colorShader"].SetVec3("pointLights[2].position", light.GetPosition());
-		pShaders["colorShader"].SetVec3("pointLights[2].ambient", light.GetAmbient());
-		pShaders["colorShader"].SetVec3("pointLights[2].diffuse", light.GetDiffuse());
-		pShaders["colorShader"].SetVec3("pointLights[2].specular", light.GetSpecular());
-		pShaders["colorShader"].SetFloat("pointLights[2].constant", 1.0f);
-		pShaders["colorShader"].SetFloat("pointLights[2].linear", 0.07f);
-		pShaders["colorShader"].SetFloat("pointLights[2].quadratic", 0.3f);
+		for (unsigned int i = 0; i < pLights.size(); i++)
+		{
+			Light light = pLights.at(i);
+			std::string str = std::to_string(i);
+			pShaders["colorShader"].SetVec3("pointLights["+str+"].position", light.GetPosition());
+			pShaders["colorShader"].SetVec3("pointLights["+str+"].ambient", light.GetAmbient());
+			pShaders["colorShader"].SetVec3("pointLights["+str+"].diffuse", light.GetDiffuse());
+			pShaders["colorShader"].SetVec3("pointLights["+str+"].specular", light.GetSpecular());
+			pShaders["colorShader"].SetFloat("pointLights["+str+"].constant", 1.0f);
+			pShaders["colorShader"].SetFloat("pointLights["+str+"].linear", 0.07f);
+			pShaders["colorShader"].SetFloat("pointLights["+str+"].quadratic", 0.3f);
+			pShaders["colorShader"].SetFloat("pointLights[" + str + "].intensity", light.GetIntensity());
+		}
 
 		gameObject.Draw(pShaders["colorShader"]);
 	}
 
+
 	//Render with swapping buffers to create bloom.
 	bool horizontal = true;
 	bool firstIteration = true;
-	int passes = 16;
 	pShaders["blurShader"].Use();
 
 	glBindVertexArray(pQuadVAO);
 	glDisable(GL_DEPTH_TEST);
 
-	for (int i = 0; i < passes; i++)
+	for (int i = 0; i < pBloom.passes; i++)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
 		pShaders["blurShader"].SetInt("horizontal", horizontal);
@@ -352,7 +433,6 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	glBindTexture(GL_TEXTURE_2D, pHdrColorbuffers[0]);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, pBloomColorbuffers[horizontal]);
-
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 
 
@@ -360,7 +440,7 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	pShaders["blurShader"].Use();
 	horizontal = true;
 	firstIteration = true;
-	passes = 6;
+	int passes = 10;
 
 	for (int i = 0; i < passes; i++)
 	{

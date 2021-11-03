@@ -14,8 +14,13 @@ class Light : public GameObject
 public:
 	Light(std::string pName, LightType pLightType, glm::vec3 pColor, const char* path, float pIntensity = 1.0f);
 	glm::vec3 GetAmbient() const;
+	void SetAmbient(const glm::vec3 pColor);
 	glm::vec3 GetDiffuse() const;
+	void SetDiffuse(const glm::vec3 pColor);
 	glm::vec3 GetSpecular() const;
+	void SetSpecular(const glm::vec3 pColor);
+	float GetIntensity() const;
+	void SetIntensity(const float pIntensity);
 	LightType GetLightType() const;
 
 private:

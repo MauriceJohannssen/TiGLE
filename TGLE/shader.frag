@@ -33,6 +33,8 @@ struct PointLight
 	float constant;
 	float linear;
 	float quadratic;
+
+	float intensity;
 };
 
 #define POINT_LIGHT_COUNT 3  
@@ -40,6 +42,7 @@ uniform PointLight pointLights[POINT_LIGHT_COUNT];
 
 //Camera
 uniform vec3 cameraPosition;
+uniform float bloomThreshold;
 
 vec3 CalcDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition, vec3 pViewDirection);
 
@@ -56,7 +59,7 @@ void main()
 	float brightness = dot(finalColor.rgb, vec3(0.2126, 0.7152, 0.0722));
 
 	//This value determines what will be "considered" bloom.
-	if(brightness > 1.9)
+	if(brightness > bloomThreshold)
 		brightColor = vec4(finalColor,1);
 	else
 		brightColor = vec4(0,0,0,1);
@@ -69,7 +72,8 @@ vec3 CalcDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPositio
 {
 	//Ambient
 	pViewDirection = normalize(pViewDirection);
-	vec3 ambient = vec3(texture(material.texture_diffuse1, vUVs)) * pointLight.ambient;
+	//Todo: Currently the ambient value is lowered here. This should be a variable!
+	vec3 ambient = vec3(texture(material.texture_diffuse1, vUVs)) * pointLight.ambient * 0.2;
 	//Diffuse
 	vec3 lightDirection = normalize(pointLight.position - vFragPosition);
 	vec3 diffuse = max(dot(pNormal, lightDirection), 0.0) * vec3(texture(material.texture_diffuse1, vUVs)) * pointLight.diffuse;
@@ -82,5 +86,5 @@ vec3 CalcDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPositio
 	float distanceLightFrag = length(pointLight.position - vFragPosition);
 	float attenuation = 1.0 / (pointLight.constant + pointLight.linear * distanceLightFrag + pointLight.quadratic * (distanceLightFrag * distanceLightFrag));
 
-	return (ambient + diffuse + specular) * attenuation;
+	return (ambient + diffuse + specular) * attenuation * pointLight.intensity;
 }

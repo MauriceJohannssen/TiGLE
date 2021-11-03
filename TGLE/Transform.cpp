@@ -23,7 +23,8 @@ glm::vec3 Transform::GetPosition() const
 
 void Transform::SetPosition(const glm::vec3 pPosition)
 {	
- 	objectSpace = glm::translate(glm::mat4(1), pPosition);
+	objectSpace[3] = glm::vec4(pPosition,1);
+ 	//objectSpace = glm::translate(glm::mat4(1), pPosition);
 }
 
 void Transform::Translate(const glm::vec3 pDirection)
