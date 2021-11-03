@@ -1,5 +1,7 @@
 #include "glad/glad.h"
 #include "Input.h"
+#include "imgui.h"
+#include "imgui-SFML.h"
 
 int lastMouseX = 800;
 int lastMouseY = 450;
@@ -12,6 +14,7 @@ void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
 	sf::Event event;
 	while(pWindow->pollEvent(event))
 	{
+		ImGui::SFML::ProcessEvent(event);
 		switch (event.type)
 		{
 		case sf::Event::Closed:
@@ -43,7 +46,7 @@ void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
 			break;
 
 		case sf::Event::MouseMoved:
-			
+			if (!sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle)) break;
 			sf::Vector2i center(pWindow->getSize().x / 2, pWindow->getSize().y / 2);
 			const sf::Vector2i currentPosition = sf::Mouse::getPosition(*pWindow) - center;
 

@@ -2,6 +2,7 @@
 #include "glad/glad.h"
 #include <SFML/Window.hpp>
 #include <SFML/Graphics/Image.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
 #include <iostream>
 #include <stb_image.h>
 #include "Input.h"
@@ -15,6 +16,10 @@
 #include <vector>
 #include <map>
 #include "Light.h"
+#include "imgui.h"
+#include "imgui-SFML.h"
+
+#include <SFML/Graphics/CircleShape.hpp>
 
 int windowWidth = 1600;
 int windowHeight = 900;
@@ -49,7 +54,7 @@ int main()
 	settings.majorVersion = 3;
 	settings.minorVersion = 3;
 
-	sf::Window window(sf::VideoMode(windowWidth, windowHeight), "TiGLE", sf::Style::Default, settings);
+	sf::RenderWindow window(sf::VideoMode(windowWidth, windowHeight), "TiGLE", sf::Style::Default, settings);
 	window.setVerticalSyncEnabled(true);
 	window.setActive(true);
 
@@ -59,10 +64,13 @@ int main()
 
 	window.setMouseCursorVisible(false);
 
+	
 	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(sf::Context::getFunction)))
 	{
 		std::cout << "Error: Could not initialize GLAD";
 	}
+
+	ImGui::SFML::Init(window);
 
 	DebugInformation();
 
@@ -136,27 +144,43 @@ int main()
 
 	//Time
 	sf::Clock clock;
-	float deltaTime = 0.0f;
-	float lastFrame = 0.0f;
+	sf::Time deltaTime;
+	sf::Time lastFrame;
 
 	//Camera
 	Camera mainCamera(Perspective);
 	mainCamera.SetPosition(glm::vec3(0, 0, 3));
 	mainCamera.SetForward(glm::vec3(0, 0, -1));
 
+	struct DepthOfField {
+		float aperture;
+		float imageDistance;
+		float focalLength;
+		float planeInFocus;
+	};
+
+	DepthOfField DoF;
+	DoF.aperture = 1.f;
+	DoF.imageDistance = 1.f;
+	DoF.focalLength = 0.6f;
+	DoF.planeInFocus = 1.5f;
+
+	//GUI variables
+	bool static showCreditsActive = false;
+
 	while (window.isOpen())
 	{
 		//Update Time
-		deltaTime = clock.getElapsedTime().asSeconds() - lastFrame;
-		lastFrame = clock.getElapsedTime().asSeconds();
+		deltaTime = clock.getElapsedTime() - lastFrame;
+		lastFrame = clock.getElapsedTime();
 
 		//Input
-		HandleInput(&window, &mainCamera, deltaTime);
+		HandleInput(&window, &mainCamera, deltaTime.asSeconds());
 
 		//Camera movement
 		if (mainCamera.GetMovementVector().length() > 0.01f)
 		{
-			mainCamera.Translate(mainCamera.GetMovementVector() * 0.8f * deltaTime);
+			mainCamera.Translate(mainCamera.GetMovementVector() * 0.8f * deltaTime.asSeconds());
 			mainCamera.SetMovementVector(mainCamera.GetMovementVector() * 0.9f);
 		}
 
@@ -166,11 +190,66 @@ int main()
 		//Render
 		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO, hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers, vertexPosition);
 
+		window.pushGLStates();
+
+		//Imgui
+		ImGui::SFML::Update(window, deltaTime);
+		
+		//Depth of Field settings
+		ImGui::Begin("Depth of Field Settings");
+		ImGui::SliderFloat("Aperture", &DoF.aperture, 0.0f, 1.0f);
+		ImGui::SliderFloat("Image Distance", &DoF.imageDistance, -6.0f, 10.0f);
+		ImGui::SliderFloat("Focal Length", &DoF.focalLength, 0.0f, 10.0f);
+		ImGui::SliderFloat("Plane in Focus", &DoF.planeInFocus, 0.0f, 10.0f);
+		ImGui::End();
+
+		shaders["dofShader"].Use();
+		shaders["dofShader"].SetFloat("aperture", DoF.aperture);
+		shaders["dofShader"].SetFloat("imageDistance", DoF.imageDistance);
+		shaders["dofShader"].SetFloat("focalLength", DoF.focalLength);
+		shaders["dofShader"].SetFloat("planeInFocus", DoF.planeInFocus);
+
+	
+
+		//Menu bar
+		ImGui::BeginMainMenuBar();
+		if (ImGui::BeginMenu("File")) 
+		{
+			if (ImGui::MenuItem("Open...")) 
+			{
+				//Import file
+			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("About")) 
+		{
+			if (ImGui::MenuItem("Credits")) 
+				showCreditsActive = true;
+			ImGui::EndMenu();
+		}
+		ImGui::EndMainMenuBar();
+
+		if (showCreditsActive)
+		{
+			ImGui::Begin("Credits", &showCreditsActive);
+			ImGui::Text("Developed by Maurice Johannssen @ Saxion UAS");
+			ImGui::End();
+		}
+		
+		//Render GUI
+		ImGui::SFML::Render(window);
+
+		//Restore previous GL states
+		window.popGLStates();
+
 		//Swap Buffers
 		window.display();
+		window.clear();
 	}
 
+	//Free memory
 	window.close();
+	ImGui::SFML::Shutdown();
 
 	return 0;
 }
@@ -300,6 +379,7 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	}
 	
 	pShaders["dofShader"].Use();
+	pShaders["dofShader"].SetVec3("cameraPosition", pCamera.GetPosition());
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glActiveTexture(GL_TEXTURE0);
@@ -309,7 +389,11 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, pVertexPositions);
 
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
+	glBindVertexArray(0);
 }
 
 //This is supposed to print all sorts of general debug information.
@@ -392,6 +476,8 @@ void CreateBloomBuffers(unsigned int pSwappingFramebuffers[], unsigned int pSwap
 		//Bind to framebuffer
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pSwappingColorbuffers[i], 0);
 	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void CreateRenderQuad(unsigned int& pVAO)
