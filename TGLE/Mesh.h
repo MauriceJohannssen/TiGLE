@@ -5,8 +5,7 @@
 #include <vector>
 #include "Shader.h"
 
-struct Vertex
-{
+struct Vertex {
 	glm::vec3 position;
 	glm::vec3 normal;
 	glm::vec2 UV;
@@ -18,8 +17,7 @@ struct Texture {
 	std::string path;
 };
 
-class Mesh
-{
+class Mesh {
 public:
 	Mesh(std::vector<Vertex> pVertices, std::vector<unsigned int> pIndices, std::vector<Texture> pTextures);
 	void Draw(Shader& pShader);

@@ -1,14 +1,9 @@
 #pragma once
 #include "Transform.h"
 
-enum ProjectionType
-{
-	Orthographic,
-	Perspective
-};
+enum class ProjectionType;
 
-class Camera : public Transform
-{
+class Camera : public Transform {
 public:
 	Camera(ProjectionType pProjection);
 	glm::mat4 GetProjectionMatrix() const;

@@ -1,12 +1,10 @@
 ﻿#include "Mesh.h"
 
-Mesh::Mesh(std::vector<Vertex> pVertices, std::vector<unsigned int> pIndices, std::vector<Texture> pTextures): vertices(pVertices), indices(pIndices), textures(pTextures)
-{
-    SetupGL();
+Mesh::Mesh(std::vector<Vertex> pVertices, std::vector<unsigned int> pIndices, std::vector<Texture> pTextures) : vertices(pVertices), indices(pIndices), textures(pTextures) {
+	SetupGL();
 }
 
-void Mesh::SetupGL()
-{
+void Mesh::SetupGL() {
 	//1. Create VAO
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
@@ -38,30 +36,27 @@ void Mesh::SetupGL()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void Mesh::Draw(Shader& pShader)
-{
-    unsigned int diffuseNumber = 1;
-    unsigned int specularNumber = 1;
+void Mesh::Draw(Shader& pShader) {
+	unsigned int diffuseNumber = 1;
+	unsigned int specularNumber = 1;
 
-    for (unsigned int i = 0; i < textures.size(); i++)
-    {
-        glActiveTexture(GL_TEXTURE0 + i);
-        std::string number;
-        std::string name = textures[i].type;
-        if (name == "texture_diffuse")
-        {
-            number = std::to_string(diffuseNumber++);
-        }
-        else if (name == "texture_specular")
-        {
-            number = std::to_string(specularNumber++);
-        }
+	for (unsigned int i = 0; i < textures.size(); i++) {
+		glActiveTexture(GL_TEXTURE0 + i);
+		std::string number;
+		std::string name = textures[i].type;
+		if (name == "texture_diffuse") {
+			number = std::to_string(diffuseNumber++);
+		}
+		else if (name == "texture_specular") {
+			number = std::to_string(specularNumber++);
+		}
 
-        pShader.SetInt(("material." + name + number).c_str(), i);
+		pShader.SetInt(("material." + name + number).c_str(), i);
 		glBindTexture(GL_TEXTURE_2D, textures[i].id);
-    }
+	}
+
 	glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
+	glBindVertexArray(VAO);
+	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
 }

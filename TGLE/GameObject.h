@@ -6,10 +6,10 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 
-class GameObject : public Transform
-{
+class GameObject : public Transform {
 public:
 	GameObject(const char* pPath);
+	GameObject(const char* pPath, std::string& pName);
 	void Draw(Shader& shader);
 
 private:

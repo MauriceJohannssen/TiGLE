@@ -9,14 +9,12 @@ float pitch = 0.0;
 float yaw = -90.0f;
 bool firstMouseMovement = true;
 
-void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
-{
+void HandleInput(sf::Window* pWindow, Camera* pCamera, float pDeltaTime) {
 	sf::Event event;
-	while(pWindow->pollEvent(event))
-	{
+	while (pWindow->pollEvent(event)) {
 		ImGui::SFML::ProcessEvent(event);
-		switch (event.type)
-		{
+
+		switch (event.type) {
 		case sf::Event::Closed:
 			pWindow->close();
 			break;
@@ -24,9 +22,9 @@ void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
 		case sf::Event::Resized:
 			glViewport(0, 0, event.size.width, event.size.height);
 			break;
+
 		case sf::Event::KeyPressed:
-			switch(event.key.code)
-			{
+			switch (event.key.code) {
 			case sf::Keyboard::W:
 				pCamera->SetMovementVector(pCamera->GetMovementVector() + pCamera->GetForward());
 				break;
@@ -46,12 +44,12 @@ void HandleInput(sf::Window* pWindow, Camera *pCamera, float pDeltaTime)
 			break;
 
 		case sf::Event::MouseMoved:
-			if (!sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle)) break;
+			if (!sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle))
+				break;
 			sf::Vector2i center(pWindow->getSize().x / 2, pWindow->getSize().y / 2);
 			const sf::Vector2i currentPosition = sf::Mouse::getPosition(*pWindow) - center;
 
-			if(firstMouseMovement)
-			{
+			if (firstMouseMovement) {
 				firstMouseMovement = false;
 				sf::Mouse::setPosition(center, *pWindow);
 			}

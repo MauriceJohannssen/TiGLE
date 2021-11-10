@@ -1,10 +1,10 @@
 ﻿#include "Light.h"
 
-Light::Light(std::string pName, LightType pLightType, glm::vec3 pColor, const char* path, float pIntensity) : GameObject(path), lightType(pLightType), ambient(pColor), diffuse(pColor), specular(pColor), intensity(pIntensity){
-	
+Light::Light(std::string pName, LightType pLightType, glm::vec3 pColor, const char* path, float pIntensity) : GameObject(path), lightType(pLightType), ambient(pColor), diffuse(pColor), specular(pColor), intensity(pIntensity) {
+
 }
 
-glm::vec3 Light::GetAmbient() const{
+glm::vec3 Light::GetAmbient() const {
 	return ambient;
 }
 
@@ -12,7 +12,7 @@ void Light::SetAmbient(glm::vec3 pColor) {
 	ambient = pColor;
 }
 
-glm::vec3 Light::GetDiffuse() const{
+glm::vec3 Light::GetDiffuse() const {
 	return diffuse;
 }
 
@@ -20,11 +20,11 @@ void Light::SetDiffuse(const glm::vec3 pColor) {
 	diffuse = pColor;
 }
 
-glm::vec3 Light::GetSpecular() const{
+glm::vec3 Light::GetSpecular() const {
 	return specular;
 }
 
-void Light::SetSpecular (const glm::vec3 pColor) {
+void Light::SetSpecular(const glm::vec3 pColor) {
 	specular = pColor;
 }
 
@@ -37,6 +37,12 @@ void Light::SetIntensity(const float pIntensity) {
 	intensity = pIntensity;
 }
 
-LightType Light::GetLightType() const{
+LightType Light::GetLightType() const {
 	return lightType;
 }
+
+enum class LightType {
+	Directional,
+	Point,
+	Spot
+};

@@ -160,14 +160,12 @@
     <ClInclude Include="Shader.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="bloomShader.frag" />
+    <None Include="BloomTonemapping.frag" />
     <None Include="DoFShader.frag" />
-    <None Include="gaussianBlurShader.frag" />
-    <None Include="lightShader.frag" />
-    <None Include="shader.frag" />
-    <None Include="textureShader.frag" />
-    <None Include="textureShader.vert" />
-    <None Include="shader.vert" />
+    <None Include="GaussianBlur.frag" />
+    <None Include="LightSource.frag" />
+    <None Include="Lit.frag" />
+    <None Include="Lit.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

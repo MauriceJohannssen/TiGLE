@@ -2,12 +2,7 @@
 #include "Transform.h"
 #include "GameObject.h"
 
-enum LightType
-{
-	Directional,
-	Point,
-	Spot
-};
+enum class LightType;
 
 class Light : public GameObject
 {
