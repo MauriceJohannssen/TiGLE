@@ -18,7 +18,6 @@
 #include "Light.h"
 #include "imgui.h"
 #include "imgui-SFML.h"
-
 #include <SFML/Graphics/CircleShape.hpp>
 
 int windowWidth = 1600;
@@ -32,7 +31,6 @@ struct Bloom {
 struct DepthOfField {
 	float aperture;
 	float imageDistance;
-	float focalLength;
 	float planeInFocus;
 	float near;
 	float far;
@@ -44,8 +42,8 @@ void CreateBloomBuffers(unsigned int pFramebuffers[], unsigned int pColorbuffers
 void CreateRenderQuad(unsigned int& pVAO);
 void LightGui(Light& pLight);
 
-void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix,const glm::mat4& pProjectionMatrix, 
-	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[], 
+void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
+	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
 	unsigned int& pVertexPositions, Bloom& pBloom);
 
 
@@ -79,7 +77,7 @@ int main()
 
 	window.setMouseCursorVisible(false);
 
-	
+
 	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(sf::Context::getFunction)))
 	{
 		std::cout << "Error: Could not initialize GLAD";
@@ -108,24 +106,24 @@ int main()
 
 	//Setup shaders
 	std::map<std::string, Shader> shaders;
-	shaders["colorShader"] = Shader("shader.vert", "shader.frag");
-	shaders["lightShader"] = Shader("shader.vert", "lightShader.frag");
+	shaders["colorShader"] = Shader("Shaders/Lit.vert", "Shaders/Lit.frag");
+	shaders["lightShader"] = Shader("Shaders/Lit.vert", "Shaders/LightSource.frag");
 
-	Shader textureShader("textureShader.vert", "textureShader.frag");
+	Shader textureShader("Shaders/Texture.vert", "Shaders/Texture.frag");
 	textureShader.Use();
 	textureShader.SetInt("screenTexture", 0);
 	shaders["textureShader"] = textureShader;
 
-	shaders["blurShader"] = Shader("textureShader.vert", "gaussianBlurShader.frag");
+	shaders["blurShader"] = Shader("Shaders/Texture.vert", "Shaders/GaussianBlur.frag");
 
-	Shader bloomShader("textureShader.vert", "bloomShader.frag");
+	Shader bloomShader("Shaders/Texture.vert", "Shaders/BloomTonemapping.frag");
 	bloomShader.Use();
 	bloomShader.SetInt("hdrRender", 0);
 	bloomShader.SetInt("bloomRender", 1);
 
 	shaders["bloomShader"] = bloomShader;
 
-	Shader DoFShader("textureShader.vert", "DoFShader.frag");
+	Shader DoFShader("Shaders/Texture.vert", "Shaders/DoFShader.frag");
 	DoFShader.Use();
 	DoFShader.SetInt("sharpTexture", 0);
 	DoFShader.SetInt("blurredTexture", 1);
@@ -137,7 +135,7 @@ int main()
 
 	//GameObjects
 	GameObject gameObject1("Models/R99/R99.obj");
-	gameObject1.SetPosition(glm::vec3(-0.5f, -0.25f, 0));
+	gameObject1.SetPosition(glm::vec3(1.5f, -0.5f, 0));
 	gameObject1.Scale(glm::vec3(2));
 	gameObjects.push_back(gameObject1);
 
@@ -147,18 +145,18 @@ int main()
 	gameObjects.push_back(gameObject2);
 
 	//Lights
-	Light light("light_1", Point, glm::vec3(1, 0, 0), "Models/Cube/Cube.obj", 3);
+	Light light("light_1", LightType::Point, glm::vec3(0.1f, 0.05f, 1), "Models/Cube/Cube.obj", 6);
 	light.SetPosition(glm::vec3(0.5f, 0.5f, 1));
 	light.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light);
 
-	Light light2("light_2", Point, glm::vec3(0, 1, 0), "Models/Cube/Cube.obj", 3);
+	Light light2("light_2", LightType::Point, glm::vec3(1, 0, 1), "Models/Cube/Cube.obj", 3);
 	light2.SetPosition(glm::vec3(0.2f, 0.5, -1));
 	light2.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light2);
 
-	Light light3("light_3", Point, glm::vec3(0, 0, 1), "Models/Cube/Cube.obj", 2);
-	light3.SetPosition(glm::vec3(1, 0, 0));
+	Light light3("light_3", LightType::Point, glm::vec3(0.2f, 1, 0), "Models/Cube/Cube.obj", 2);
+	light3.SetPosition(glm::vec3(0.3f, 0, 0));
 	light3.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light3);
 
@@ -168,18 +166,17 @@ int main()
 	sf::Time lastFrame;
 
 	//Camera
-	Camera mainCamera(Perspective);
+	Camera mainCamera(ProjectionType::Perspective);
 	mainCamera.SetPosition(glm::vec3(0, 0, 3));
 	mainCamera.SetForward(glm::vec3(0, 0, -1));
 
 	Bloom bloom;
-	bloom.threshold = 1.6f;
-	bloom.passes = 10;
+	bloom.threshold = 2.f;
+	bloom.passes = 20;
 
 	DepthOfField DoF;
 	DoF.aperture = 1.f;
 	DoF.imageDistance = 1.f;
-	DoF.focalLength = 0.6f;
 	DoF.planeInFocus = 1.5f;
 	DoF.near = 0.1f;
 	DoF.far = 2;
@@ -207,12 +204,15 @@ int main()
 			mainCamera.SetMovementVector(mainCamera.GetMovementVector() * 0.9f);
 		}
 
+		gameObjects.at(0).Rotate(-1 * deltaTime.asSeconds(), glm::vec3(0, 1, 0));
+
 		//Update View Matrix
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
 
 		//Render
-		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO, 
+		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO,
 			hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers, vertexPosition, bloom);
+
 
 		window.pushGLStates();
 
@@ -221,9 +221,9 @@ int main()
 
 		//Menu bar
 		ImGui::BeginMainMenuBar();
-		if (ImGui::BeginMenu("File")) 
+		if (ImGui::BeginMenu("File"))
 		{
-			if (ImGui::MenuItem("Open")) 
+			if (ImGui::MenuItem("Open"))
 			{
 				//Import file
 			}
@@ -273,7 +273,6 @@ int main()
 			ImGui::Begin("Depth of Field Settings", &showDoFSettings);
 			ImGui::SliderFloat("Aperture", &DoF.aperture, 0.0f, 1.0f);
 			ImGui::SliderFloat("Image Distance", &DoF.imageDistance, 0.0f, 20.0f);
-			ImGui::SliderFloat("Focal Length", &DoF.focalLength, 0.0f, 2.0f);
 			ImGui::SliderFloat("Plane in Focus", &DoF.planeInFocus, 0.0f, 20.0f);
 			ImGui::SliderFloat("Near", &DoF.near, 0.0f, 20.0f);
 			ImGui::SliderFloat("Far", &DoF.far, 0.0f, 20.0f);
@@ -296,11 +295,10 @@ int main()
 		shaders["dofShader"].Use();
 		shaders["dofShader"].SetFloat("aperture", DoF.aperture);
 		shaders["dofShader"].SetFloat("imageDistance", DoF.imageDistance);
-		shaders["dofShader"].SetFloat("focalLength", DoF.focalLength);
 		shaders["dofShader"].SetFloat("planeInFocus", DoF.planeInFocus);
 		shaders["dofShader"].SetFloat("near", DoF.near);
 		shaders["dofShader"].SetFloat("far", DoF.far);
-		
+
 		//Render GUI
 		ImGui::SFML::Render(window);
 
@@ -325,7 +323,7 @@ void LightGui(Light& pLight) {
 		pLight.SetPosition(vec);
 	}
 	glm::vec3 light = pLight.GetAmbient();
-	if (ImGui::ColorEdit3("Ambient", glm::value_ptr(light))){
+	if (ImGui::ColorEdit3("Ambient", glm::value_ptr(light))) {
 		pLight.SetAmbient(light);
 	}
 	light = pLight.GetDiffuse();
@@ -343,7 +341,7 @@ void LightGui(Light& pLight) {
 }
 
 void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
-	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[], 
+	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
 	unsigned int& pVertexPositions, Bloom& pBloom)
 {
 	//Bind off-screen framebuffer
@@ -369,12 +367,15 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 
 	for (GameObject& gameObject : pGameObjects)
 	{
+		glm::mat4* objectMatrix = gameObject.GetObjectMatrix();
 		pShaders["colorShader"].Use();
-		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * *gameObject.GetObjectMatrix();
+		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * *objectMatrix;
 		pShaders["colorShader"].SetMat4("transform", MVPMatrix);
-		pShaders["colorShader"].SetMat4("objectMatrix", *gameObject.GetObjectMatrix());
+		pShaders["colorShader"].SetMat4("objectMatrix", *objectMatrix);
 		pShaders["colorShader"].SetVec3("cameraPosition", pCamera.GetPosition());
-		
+
+		delete objectMatrix;
+
 		//Bloom threshold
 		pShaders["colorShader"].SetFloat("bloomThreshold", pBloom.threshold);
 
@@ -385,13 +386,13 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 		{
 			Light light = pLights.at(i);
 			std::string str = std::to_string(i);
-			pShaders["colorShader"].SetVec3("pointLights["+str+"].position", light.GetPosition());
-			pShaders["colorShader"].SetVec3("pointLights["+str+"].ambient", light.GetAmbient());
-			pShaders["colorShader"].SetVec3("pointLights["+str+"].diffuse", light.GetDiffuse());
-			pShaders["colorShader"].SetVec3("pointLights["+str+"].specular", light.GetSpecular());
-			pShaders["colorShader"].SetFloat("pointLights["+str+"].constant", 1.0f);
-			pShaders["colorShader"].SetFloat("pointLights["+str+"].linear", 0.07f);
-			pShaders["colorShader"].SetFloat("pointLights["+str+"].quadratic", 0.3f);
+			pShaders["colorShader"].SetVec3("pointLights[" + str + "].position", light.GetPosition());
+			pShaders["colorShader"].SetVec3("pointLights[" + str + "].ambient", light.GetAmbient());
+			pShaders["colorShader"].SetVec3("pointLights[" + str + "].diffuse", light.GetDiffuse());
+			pShaders["colorShader"].SetVec3("pointLights[" + str + "].specular", light.GetSpecular());
+			pShaders["colorShader"].SetFloat("pointLights[" + str + "].constant", 1.0f);
+			pShaders["colorShader"].SetFloat("pointLights[" + str + "].linear", 0.07f);
+			pShaders["colorShader"].SetFloat("pointLights[" + str + "].quadratic", 0.3f);
 			pShaders["colorShader"].SetFloat("pointLights[" + str + "].intensity", light.GetIntensity());
 		}
 
@@ -446,7 +447,7 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
 		pShaders["blurShader"].SetInt("horizontal", horizontal);
-		
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, firstIteration ? pHdrColorbuffers[1] : pBloomColorbuffers[!horizontal]);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
@@ -457,7 +458,7 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 			firstIteration = false;
 		}
 	}
-	
+
 	pShaders["dofShader"].Use();
 	pShaders["dofShader"].SetVec3("cameraPosition", pCamera.GetPosition());
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -503,7 +504,7 @@ void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		
+
 		//Bind to framebuffer
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, pColorbuffers[i], 0);
 	}
@@ -546,13 +547,13 @@ void CreateBloomBuffers(unsigned int pSwappingFramebuffers[], unsigned int pSwap
 		glBindFramebuffer(GL_FRAMEBUFFER, pSwappingFramebuffers[i]);
 		glBindTexture(GL_TEXTURE_2D, pSwappingColorbuffers[i]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-		
+
 		//No need to set mipmap option here.
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		
+
 		//Bind to framebuffer
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pSwappingColorbuffers[i], 0);
 	}

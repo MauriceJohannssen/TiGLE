@@ -40,9 +40,3 @@ void Light::SetIntensity(const float pIntensity) {
 LightType Light::GetLightType() const {
 	return lightType;
 }
-
-enum class LightType {
-	Directional,
-	Point,
-	Spot
-};

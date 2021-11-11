@@ -20,9 +20,3 @@ glm::vec3 Camera::GetMovementVector() const {
 void Camera::SetMovementVector(const glm::vec3 pVector) {
 	movementVector = pVector;
 }
-
-
-enum class ProjectionType {
-	Orthographic,
-	Perspective
-};

@@ -70,22 +70,28 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Lit.vert">
+    <None Include="Shaders\BloomTonemapping.frag">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="Lit.frag">
+    <None Include="Shaders\DoFShader.frag">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="LightSource.frag">
+    <None Include="Shaders\GaussianBlur.frag">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="GaussianBlur.frag">
+    <None Include="Shaders\LightSource.frag">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="BloomTonemapping.frag">
+    <None Include="Shaders\Lit.frag">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="DoFShader.frag">
+    <None Include="Shaders\Lit.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Shaders\Texture.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Shaders\Texture.vert">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

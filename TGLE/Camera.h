@@ -1,7 +1,10 @@
 #pragma once
 #include "Transform.h"
 
-enum class ProjectionType;
+enum class ProjectionType {
+	Orthographic,
+	Perspective
+};
 
 class Camera : public Transform {
 public:

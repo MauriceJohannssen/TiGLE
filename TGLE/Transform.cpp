@@ -43,6 +43,10 @@ void Transform::Scale(const glm::vec3 pScale) {
 	objectSpace = glm::scale(objectSpace, pScale);
 }
 
+void Transform::Rotate(const float pAngle, const glm::vec3 pAxis) {
+	objectSpace = glm::rotate(objectSpace, pAngle, pAxis);
+}
+
 
 glm::mat4* Transform::GetObjectMatrix() const {
 	return new glm::mat4(objectSpace);

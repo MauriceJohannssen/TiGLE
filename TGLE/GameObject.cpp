@@ -67,7 +67,7 @@ Mesh GameObject::ProcessMesh(aiMesh* mesh, const aiScene* pScene) {
 			glm::vec2 uv;
 			uv.x = mesh->mTextureCoords[0][i].x;
 			uv.y = mesh->mTextureCoords[0][i].y;
-			vertex.UV = vector;
+			vertex.UV = uv;
 		}
 		else {
 			vertex.UV = glm::vec2(0);
@@ -143,7 +143,7 @@ unsigned int GameObject::CreateTextureFromFile(const char* path, const std::stri
 			break;
 		default:
 			std::cout << "Error::TextureFromFile::Could not assign texture format!" << std::endl;
-			return;
+			return 0;
 		}
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);

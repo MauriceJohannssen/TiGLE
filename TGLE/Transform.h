@@ -21,6 +21,8 @@ public:
 
 	void Scale(const glm::vec3 pScale);
 
+	void Rotate(const float pAngle, const glm::vec3 pAxis);
+
 	glm::mat4* GetObjectMatrix() const;
 
 private:
