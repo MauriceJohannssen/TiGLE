@@ -55,8 +55,8 @@ void HandleInput(sf::Window* pWindow, Camera* pCamera, float pDeltaTime) {
 			}
 
 			sf::Mouse::setPosition(center, *pWindow);
-			float mouseOffsetX = currentPosition.x;
-			float mouseOffsetY = -currentPosition.y;
+			float mouseOffsetX = static_cast<float>(currentPosition.x);
+			float mouseOffsetY = static_cast<float>( - currentPosition.y);
 
 			float sensitivity = 15.0f;
 			mouseOffsetX *= sensitivity;

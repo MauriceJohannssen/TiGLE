@@ -23,7 +23,7 @@ public:
 
 	void Rotate(const float pAngle, const glm::vec3 pAxis);
 
-	glm::mat4* GetObjectMatrix() const;
+	glm::mat4 GetObjectMatrix() const;
 
 private:
 	static unsigned int ObjectCount;

@@ -17,6 +17,6 @@ glm::vec3 Camera::GetMovementVector() const {
 	return movementVector;
 }
 
-void Camera::SetMovementVector(const glm::vec3 pVector) {
-	movementVector = pVector;
+void Camera::SetMovementVector(const glm::vec3 vector) {
+	movementVector = vector;
 }

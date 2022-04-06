@@ -48,6 +48,6 @@ void Transform::Rotate(const float pAngle, const glm::vec3 pAxis) {
 }
 
 
-glm::mat4* Transform::GetObjectMatrix() const {
-	return new glm::mat4(objectSpace);
+glm::mat4 Transform::GetObjectMatrix() const {
+	return objectSpace;
 }

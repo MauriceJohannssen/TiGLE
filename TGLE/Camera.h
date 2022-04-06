@@ -11,7 +11,7 @@ public:
 	Camera(ProjectionType pProjection);
 	glm::mat4 GetProjectionMatrix() const;
 	glm::vec3 GetMovementVector() const;
-	void SetMovementVector(const glm::vec3 pVector);
+	void SetMovementVector(const glm::vec3 vector);
 
 private:
 	glm::vec3 movementVector;

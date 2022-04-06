@@ -1,10 +1,8 @@
-#pragma once
 #include "glad/glad.h"
 #include <SFML/Window.hpp>
 #include <SFML/Graphics/Image.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <iostream>
-#include <stb_image.h>
 #include "Input.h"
 #include "Material.h"
 #include "Shader.h"
@@ -18,36 +16,42 @@
 #include "Light.h"
 #include "imgui.h"
 #include "imgui-SFML.h"
-#include <SFML/Graphics/CircleShape.hpp>
 
+//Global window settings
 int windowWidth = 1600;
 int windowHeight = 900;
 
+//GUI state variables
+struct GUIStateVariables {
+	static bool ShowCreditsActive;
+	static bool ShowDoFSettings;
+	static bool ShowBloomSettings;
+	static bool ShowLightingSettings;
+};
+
+bool GUIStateVariables::ShowCreditsActive = false;
+bool GUIStateVariables::ShowDoFSettings = false;
+bool GUIStateVariables::ShowBloomSettings = false;
+bool GUIStateVariables::ShowLightingSettings = false;
+
+//Post-processing structs
 struct Bloom {
-	float threshold;
-	int passes;
+	Bloom(float threshold, int passes) : Threshold(threshold), Passes(passes) {}
+	float Threshold;
+	int Passes;
 };
 
 struct DepthOfField {
-	float aperture;
-	float imageDistance;
-	float planeInFocus;
-	float near;
-	float far;
+	DepthOfField(float aperture, float imageDistance, float planeInFocus, float near, float far) : Aperture(aperture), ImageDistance(imageDistance),
+	PlaneInFocus(planeInFocus), Near(near), Far(far) {} 
+	float Aperture;
+	float ImageDistance;
+	float PlaneInFocus;
+	float Near;
+	float Far;
 };
 
-void DebugInformation();
-void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], unsigned int& pRenderbuffer, unsigned int& pVertexPosition);
-void CreateBloomBuffers(unsigned int pFramebuffers[], unsigned int pColorbuffers[]);
-void CreateRenderQuad(unsigned int& pVAO);
-void LightGui(Light& pLight);
-
-void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
-	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
-	unsigned int& pVertexPositions, Bloom& pBloom);
-
-
-//These vertices are being used for the rendering quad used for HDR & Bloom.
+//@Maurice: These vertices are being used for the rendering quad used for HDR & Bloom.
 float quadVertices[] = {
 	-1.0f,  1.0f,  0.0f, 1.0f,
 	-1.0f, -1.0f,  0.0f, 0.0f,
@@ -58,36 +62,35 @@ float quadVertices[] = {
 	 1.0f,  1.0f,  1.0f, 1.0f
 };
 
+void InitializeWindowContext(sf::RenderWindow& renderWindow);
+void PrintDebugInformation();
+
+void CreateHDRBuffers(unsigned int& framebuffer, unsigned int colorbuffers[], unsigned int& renderbuffer, unsigned int& vertexPosition);
+void CreateBloomBuffers(unsigned int framebuffers[], unsigned int colorbuffers[]);
+void CreateRenderQuad(unsigned int& VAO);
+void LightGui(Light& light);
+
+void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
+	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
+	unsigned int& pVertexPositions, Bloom& pBloom);
+
+
+
 int main()
 {
-	sf::ContextSettings settings;
-	settings.depthBits = 24;
-	settings.stencilBits = 8;
-	settings.antialiasingLevel = 2;
-	settings.majorVersion = 3;
-	settings.minorVersion = 3;
+	sf::ContextSettings contextSettings;
+	contextSettings.depthBits = 24;
+	contextSettings.stencilBits = 8;
+	contextSettings.antialiasingLevel = 4;
+	contextSettings.majorVersion = 4;
+	contextSettings.minorVersion = 6;
 
-	sf::RenderWindow window(sf::VideoMode(windowWidth, windowHeight), "TiGLE", sf::Style::Default, settings);
-	window.setVerticalSyncEnabled(true);
-	window.setActive(true);
+	sf::RenderWindow window(sf::VideoMode(windowWidth, windowHeight), sf::String("TiGLE"), sf::Style::Default, contextSettings);
 
-	sf::Image icon;
-	icon.loadFromFile("icon.png");
-	window.setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
+	InitializeWindowContext(window);
 
-	window.setMouseCursorVisible(false);
+	PrintDebugInformation();
 
-
-	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(sf::Context::getFunction)))
-	{
-		std::cout << "Error: Could not initialize GLAD";
-	}
-
-	ImGui::SFML::Init(window);
-
-	DebugInformation();
-
-	glViewport(0, 0, windowWidth, windowHeight);
 
 	//Setup buffers
 	unsigned int hdrFramebuffer;
@@ -106,29 +109,29 @@ int main()
 
 	//Setup shaders
 	std::map<std::string, Shader> shaders;
-	shaders["colorShader"] = Shader("Shaders/Lit.vert", "Shaders/Lit.frag");
-	shaders["lightShader"] = Shader("Shaders/Lit.vert", "Shaders/LightSource.frag");
+	shaders["ColorShader"] = Shader("Shaders/Lit.vert", "Shaders/Lit.frag");
+	shaders["LightsShader"] = Shader("Shaders/Lit.vert", "Shaders/LightSource.frag");
 
 	Shader textureShader("Shaders/Texture.vert", "Shaders/Texture.frag");
 	textureShader.Use();
 	textureShader.SetInt("screenTexture", 0);
-	shaders["textureShader"] = textureShader;
+	shaders["TextureShader"] = textureShader;
 
-	shaders["blurShader"] = Shader("Shaders/Texture.vert", "Shaders/GaussianBlur.frag");
+	shaders["BlurShader"] = Shader("Shaders/Texture.vert", "Shaders/GaussianBlur.frag");
 
 	Shader bloomShader("Shaders/Texture.vert", "Shaders/BloomTonemapping.frag");
 	bloomShader.Use();
 	bloomShader.SetInt("hdrRender", 0);
 	bloomShader.SetInt("bloomRender", 1);
 
-	shaders["bloomShader"] = bloomShader;
+	shaders["BloomShader"] = bloomShader;
 
 	Shader DoFShader("Shaders/Texture.vert", "Shaders/DoFShader.frag");
 	DoFShader.Use();
 	DoFShader.SetInt("sharpTexture", 0);
 	DoFShader.SetInt("blurredTexture", 1);
 	DoFShader.SetInt("vertexPositions", 2);
-	shaders["dofShader"] = DoFShader;
+	shaders["DofShader"] = DoFShader;
 
 	std::vector<GameObject> gameObjects;
 	std::vector<Light> lightSources;
@@ -170,23 +173,8 @@ int main()
 	mainCamera.SetPosition(glm::vec3(0, 0, 3));
 	mainCamera.SetForward(glm::vec3(0, 0, -1));
 
-	Bloom bloom;
-	bloom.threshold = 2.f;
-	bloom.passes = 20;
-
-	DepthOfField DoF;
-	DoF.aperture = 1.f;
-	DoF.imageDistance = 1.f;
-	DoF.planeInFocus = 1.5f;
-	DoF.near = 0.1f;
-	DoF.far = 2;
-
-
-	//GUI variables
-	bool static showCreditsActive = false;
-	bool static showDoFSettings = false;
-	bool static showBloomSettings = false;
-	bool static showLightingSettings = false;
+	Bloom bloom(2.f, 20);
+	DepthOfField DoF(1.f, 1.f, 1.5f, 0.1f, 2.f);
 
 	while (window.isOpen())
 	{
@@ -216,7 +204,7 @@ int main()
 
 		window.pushGLStates();
 
-		//Imgui
+		//GUI
 		ImGui::SFML::Update(window, deltaTime);
 
 		//Menu bar
@@ -231,28 +219,31 @@ int main()
 		}
 		if (ImGui::BeginMenu("Lighting"))
 		{
-			if (ImGui::MenuItem("Edit lights"))
-				showLightingSettings = true;
+			if (ImGui::MenuItem("Edit Lights"))
+			{
+				GUIStateVariables::ShowLightingSettings = true;
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Post Processing"))
 		{
 			if (ImGui::MenuItem("Depth Of Field"))
-				showDoFSettings = true;
+				GUIStateVariables::ShowDoFSettings = true;
 			if (ImGui::MenuItem("Bloom"))
-				showBloomSettings = true;
+				GUIStateVariables::ShowBloomSettings = true;
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("About"))
 		{
 			if (ImGui::MenuItem("Credits"))
-				showCreditsActive = true;
+				GUIStateVariables::ShowCreditsActive = true;
 			ImGui::EndMenu();
 		}
 		ImGui::EndMainMenuBar();
 
-		if (showLightingSettings) {
-			ImGui::Begin("Lighting settings", &showLightingSettings);
+		//Light Settings
+		if (GUIStateVariables::ShowLightingSettings) {
+			ImGui::Begin("Lighting settings", &GUIStateVariables::ShowLightingSettings);
 			if (ImGui::TreeNode("Light 1")) {
 				LightGui(lightSources.at(0));
 				ImGui::TreePop();
@@ -267,37 +258,41 @@ int main()
 			}
 		}
 
-		if (showDoFSettings)
+		//Depth of Field settings
+		if (GUIStateVariables::ShowDoFSettings)
 		{
-			//Depth of Field settings
-			ImGui::Begin("Depth of Field Settings", &showDoFSettings);
-			ImGui::SliderFloat("Aperture", &DoF.aperture, 0.0f, 1.0f);
-			ImGui::SliderFloat("Image Distance", &DoF.imageDistance, 0.0f, 20.0f);
-			ImGui::SliderFloat("Plane in Focus", &DoF.planeInFocus, 0.0f, 20.0f);
-			ImGui::SliderFloat("Near", &DoF.near, 0.0f, 20.0f);
-			ImGui::SliderFloat("Far", &DoF.far, 0.0f, 20.0f);
+			ImGui::Begin("Depth of Field Settings", &GUIStateVariables::ShowDoFSettings);
+			ImGui::SliderFloat("Aperture", &DoF.Aperture, 0.0f, 1.0f);
+			ImGui::SliderFloat("Image Distance", &DoF.ImageDistance, 0.0f, 20.0f);
+			ImGui::SliderFloat("Plane in Focus", &DoF.PlaneInFocus, 0.0f, 20.0f);
+			ImGui::SliderFloat("Near", &DoF.Near, 0.0f, 20.0f);
+			ImGui::SliderFloat("Far", &DoF.Far, 0.0f, 20.0f);
 			ImGui::End();
 		}
-		if (showBloomSettings)
+
+		//Bloom Settings
+		if (GUIStateVariables::ShowBloomSettings)
 		{
-			ImGui::Begin("Bloom settings", &showBloomSettings);
-			ImGui::SliderFloat("Threshold", &bloom.threshold, 0.0f, 10.0f);
-			ImGui::SliderInt("Passes", &bloom.passes, 2, 20);
+			ImGui::Begin("Bloom settings", &GUIStateVariables::ShowBloomSettings);
+			ImGui::SliderFloat("Threshold", &bloom.Threshold, 0.0f, 10.0f);
+			ImGui::SliderInt("Passes", &bloom.Passes, 2, 20);
 			ImGui::End();
 		}
-		if (showCreditsActive)
+
+		//Credits
+		if (GUIStateVariables::ShowCreditsActive)
 		{
-			ImGui::Begin("Credits", &showCreditsActive);
+			ImGui::Begin("Credits", &GUIStateVariables::ShowCreditsActive);
 			ImGui::Text("Developed by Maurice Johannssen @ Saxion UAS");
 			ImGui::End();
 		}
 
-		shaders["dofShader"].Use();
-		shaders["dofShader"].SetFloat("aperture", DoF.aperture);
-		shaders["dofShader"].SetFloat("imageDistance", DoF.imageDistance);
-		shaders["dofShader"].SetFloat("planeInFocus", DoF.planeInFocus);
-		shaders["dofShader"].SetFloat("near", DoF.near);
-		shaders["dofShader"].SetFloat("far", DoF.far);
+		shaders["DofShader"].Use();
+		shaders["DofShader"].SetFloat("aperture", DoF.Aperture);
+		shaders["DofShader"].SetFloat("imageDistance", DoF.ImageDistance);
+		shaders["DofShader"].SetFloat("planeInFocus", DoF.PlaneInFocus);
+		shaders["DofShader"].SetFloat("near", DoF.Near);
+		shaders["DofShader"].SetFloat("far", DoF.Far);
 
 		//Render GUI
 		ImGui::SFML::Render(window);
@@ -317,26 +312,58 @@ int main()
 	return 0;
 }
 
-void LightGui(Light& pLight) {
-	glm::vec3 vec = pLight.GetPosition();
-	if (ImGui::DragFloat3("Position", glm::value_ptr(vec), 0.05f)) {
-		pLight.SetPosition(vec);
+//@Maurice: All engine initialization should be placed here.
+void InitializeWindowContext(sf::RenderWindow& renderWindow)
+{
+	renderWindow.setVerticalSyncEnabled(true);
+	renderWindow.setActive(true);
+
+	sf::Image icon;
+	icon.loadFromFile("icon.png");
+	renderWindow.setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
+
+	renderWindow.setMouseCursorVisible(false);
+
+	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(sf::Context::getFunction)))
+	{
+		std::cout << "Error: Could not initialize GLAD!";
 	}
-	glm::vec3 light = pLight.GetAmbient();
-	if (ImGui::ColorEdit3("Ambient", glm::value_ptr(light))) {
-		pLight.SetAmbient(light);
+
+	ImGui::SFML::Init(renderWindow);
+
+	glViewport(0, 0, windowWidth, windowHeight);
+}
+
+//@Maurice: This is supposed to print all sorts of general debug information.
+void PrintDebugInformation()
+{
+	//Prints the amount of vertex attributes supported by the currently used OpenGL version.
+	int nrAttributes;
+	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nrAttributes);
+	std::cout << "Maximum number of vertex attributes is: " << nrAttributes << std::endl;
+}
+
+
+void LightGui(Light& light) {
+	glm::vec3 position = light.GetPosition();
+	if (ImGui::DragFloat3("Position", glm::value_ptr(position), 0.05f)) {
+		light.SetPosition(position);
 	}
-	light = pLight.GetDiffuse();
-	if (ImGui::ColorEdit3("Diffuse", glm::value_ptr(light))) {
-		pLight.SetDiffuse(light);
+	glm::vec3 lightComponent = light.GetAmbient();
+	if (ImGui::ColorEdit3("Ambient", glm::value_ptr(lightComponent))) {
+		light.SetAmbient(lightComponent);
 	}
-	light = pLight.GetSpecular();
-	if (ImGui::ColorEdit3("Specular", glm::value_ptr(light))) {
-		pLight.SetSpecular(light);
+	lightComponent = light.GetDiffuse();
+	if (ImGui::ColorEdit3("Diffuse", glm::value_ptr(lightComponent))) {
+		light.SetDiffuse(lightComponent);
 	}
-	float intensity = pLight.GetIntensity();
+	lightComponent = light.GetSpecular();
+	if (ImGui::ColorEdit3("Specular", glm::value_ptr(lightComponent))) {
+		light.SetSpecular(lightComponent);
+	}
+	float intensity = light.GetIntensity();
 	if (ImGui::SliderFloat("Intensity", &intensity, 0.0f, 50.0f)) {
-		pLight.SetIntensity(intensity);
+		light.SetIntensity(intensity);
 	}
 }
 
@@ -353,31 +380,30 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 
 	for (Light& light : pLights)
 	{
-		pShaders["lightShader"].Use();
-		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * *light.GetObjectMatrix();
-		pShaders["lightShader"].SetMat4("transform", MVPMatrix);
-		pShaders["lightShader"].SetMat4("objectMatrix", *light.GetObjectMatrix());
-		pShaders["lightShader"].SetVec3("lightColor", light.GetDiffuse());
-		pShaders["lightShader"].SetFloat("intensity", light.GetIntensity());
+		pShaders["LightsShader"].Use();
+		glm::mat4 objectMatrix = light.GetObjectMatrix();
+		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * objectMatrix;
+		pShaders["LightsShader"].SetMat4("transform", MVPMatrix);
+		pShaders["LightsShader"].SetMat4("objectMatrix", objectMatrix);
+		pShaders["LightsShader"].SetVec3("lightColor", light.GetDiffuse());
+		pShaders["LightsShader"].SetFloat("intensity", light.GetIntensity());
 		//Bloom threshold
-		pShaders["lightShader"].SetFloat("bloomThreshold", pBloom.threshold);
-		light.Draw(pShaders["lightShader"]);
+		pShaders["LightsShader"].SetFloat("bloomThreshold", pBloom.Threshold);
+		light.Draw(pShaders["LightsShader"]);
 	}
 
 
 	for (GameObject& gameObject : pGameObjects)
 	{
-		glm::mat4* objectMatrix = gameObject.GetObjectMatrix();
-		pShaders["colorShader"].Use();
-		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * *objectMatrix;
-		pShaders["colorShader"].SetMat4("transform", MVPMatrix);
-		pShaders["colorShader"].SetMat4("objectMatrix", *objectMatrix);
-		pShaders["colorShader"].SetVec3("cameraPosition", pCamera.GetPosition());
-
-		delete objectMatrix;
+		glm::mat4 objectMatrix = gameObject.GetObjectMatrix();
+		pShaders["ColorShader"].Use();
+		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * objectMatrix;
+		pShaders["ColorShader"].SetMat4("transform", MVPMatrix);
+		pShaders["ColorShader"].SetMat4("objectMatrix", objectMatrix);
+		pShaders["ColorShader"].SetVec3("cameraPosition", pCamera.GetPosition());
 
 		//Bloom threshold
-		pShaders["colorShader"].SetFloat("bloomThreshold", pBloom.threshold);
+		pShaders["ColorShader"].SetFloat("bloomThreshold", pBloom.Threshold);
 
 		//This is inefficient and just for testing purposes!
 		//Use uniform buffer objects or classes.
@@ -386,40 +412,39 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 		{
 			Light light = pLights.at(i);
 			std::string str = std::to_string(i);
-			pShaders["colorShader"].SetVec3("pointLights[" + str + "].position", light.GetPosition());
-			pShaders["colorShader"].SetVec3("pointLights[" + str + "].ambient", light.GetAmbient());
-			pShaders["colorShader"].SetVec3("pointLights[" + str + "].diffuse", light.GetDiffuse());
-			pShaders["colorShader"].SetVec3("pointLights[" + str + "].specular", light.GetSpecular());
-			pShaders["colorShader"].SetFloat("pointLights[" + str + "].constant", 1.0f);
-			pShaders["colorShader"].SetFloat("pointLights[" + str + "].linear", 0.07f);
-			pShaders["colorShader"].SetFloat("pointLights[" + str + "].quadratic", 0.3f);
-			pShaders["colorShader"].SetFloat("pointLights[" + str + "].intensity", light.GetIntensity());
+			pShaders["ColorShader"].SetVec3("pointLights[" + str + "].position", light.GetPosition());
+			pShaders["ColorShader"].SetVec3("pointLights[" + str + "].ambient", light.GetAmbient());
+			pShaders["ColorShader"].SetVec3("pointLights[" + str + "].diffuse", light.GetDiffuse());
+			pShaders["ColorShader"].SetVec3("pointLights[" + str + "].specular", light.GetSpecular());
+			pShaders["ColorShader"].SetFloat("pointLights[" + str + "].constant", 1.0f);
+			pShaders["ColorShader"].SetFloat("pointLights[" + str + "].linear", 0.07f);
+			pShaders["ColorShader"].SetFloat("pointLights[" + str + "].quadratic", 0.3f);
+			pShaders["ColorShader"].SetFloat("pointLights[" + str + "].intensity", light.GetIntensity());
 		}
 
-		gameObject.Draw(pShaders["colorShader"]);
+		gameObject.Draw(pShaders["ColorShader"]);
 	}
-
 
 	//Render with swapping buffers to create bloom.
 	bool horizontal = true;
 	bool firstIteration = true;
-	pShaders["blurShader"].Use();
+	pShaders["BlurShader"].Use();
 
 	glBindVertexArray(pQuadVAO);
 	glDisable(GL_DEPTH_TEST);
 
-	for (int i = 0; i < pBloom.passes; i++)
+	for (int i = 0; i < pBloom.Passes; i++)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
-		pShaders["blurShader"].SetInt("horizontal", horizontal);
+		pShaders["BlurShader"].SetInt("horizontal", horizontal);
 
 		//On first iteration bind the hdr colorbuffer, otherwise no starting texture is provided.
 		glBindTexture(GL_TEXTURE_2D, firstIteration ? pHdrColorbuffers[1] : pBloomColorbuffers[!horizontal]);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 
 		horizontal = !horizontal;
-		if (firstIteration)
-		{
+
+		if (firstIteration){
 			firstIteration = false;
 		}
 	}
@@ -428,7 +453,7 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	glBindFramebuffer(GL_FRAMEBUFFER, pHdrFramebuffer);
 
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	pShaders["bloomShader"].Use();
+	pShaders["BloomShader"].Use();
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, pHdrColorbuffers[0]);
@@ -438,7 +463,7 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 
 
 	//2. Blur whole image
-	pShaders["blurShader"].Use();
+	pShaders["BlurShader"].Use();
 	horizontal = true;
 	firstIteration = true;
 	int passes = 10;
@@ -446,21 +471,21 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	for (int i = 0; i < passes; i++)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
-		pShaders["blurShader"].SetInt("horizontal", horizontal);
+		pShaders["BlurShader"].SetInt("horizontal", horizontal);
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, firstIteration ? pHdrColorbuffers[1] : pBloomColorbuffers[!horizontal]);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 
 		horizontal = !horizontal;
-		if (firstIteration)
-		{
+
+		if (firstIteration){
 			firstIteration = false;
 		}
 	}
 
-	pShaders["dofShader"].Use();
-	pShaders["dofShader"].SetVec3("cameraPosition", pCamera.GetPosition());
+	pShaders["DofShader"].Use();
+	pShaders["DofShader"].SetVec3("cameraPosition", pCamera.GetPosition());
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glActiveTexture(GL_TEXTURE0);
@@ -477,26 +502,14 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	glBindVertexArray(0);
 }
 
-//This is supposed to print all sorts of general debug information.
-void DebugInformation()
+void CreateHDRBuffers(unsigned int& framebuffer, unsigned int colorbuffers[], unsigned int& renderbuffer, unsigned int& vertexPosition)
 {
-	int nrAttributes;
-	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nrAttributes);
-	std::cout << "Maximum number of vertex attributes is: " << nrAttributes << std::endl;
-}
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
-void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], unsigned int& pRenderbuffer, unsigned int& pVertexPosition)
-{
-	//Create a framebuffer
-	glGenFramebuffers(1, &pFramebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, pFramebuffer);
-
-	//Create attachment for the framebuffer, which is a texture in this case, since it must be read from, otherwise a renderbuffer would be better.
-	glGenTextures(2, pColorbuffers);
-
-	for (int i = 0; i < 2; i++)
-	{
-		glBindTexture(GL_TEXTURE_2D, pColorbuffers[i]);
+	glGenTextures(2, colorbuffers);
+	for (int i = 0; i < 2; ++i) {
+		glBindTexture(GL_TEXTURE_2D, colorbuffers[i]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
 		//No need to set mipmap option here.
@@ -506,12 +519,12 @@ void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 		//Bind to framebuffer
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, pColorbuffers[i], 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, colorbuffers[i], 0);
 	}
 
 	//DOF======================================================================================================================
-	glGenTextures(1, &pVertexPosition);
-	glBindTexture(GL_TEXTURE_2D, pVertexPosition);
+	glGenTextures(1, &vertexPosition);
+	glBindTexture(GL_TEXTURE_2D, vertexPosition);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_FLOAT, nullptr);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -519,33 +532,32 @@ void CreateHDRBuffers(unsigned int& pFramebuffer, unsigned int pColorbuffers[], 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	//Bind to framebuffer
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + 2, GL_TEXTURE_2D, pVertexPosition, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + 2, GL_TEXTURE_2D, vertexPosition, 0);
 
 	//Sets framebuffer to render to two textures/outputs.
 	unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
 	glDrawBuffers(3, attachments);
 
-
 	//Create Renderbuffer object for depth (and potentially stencil) values.
-	glGenRenderbuffers(1, &pRenderbuffer);
-	glBindRenderbuffer(GL_RENDERBUFFER, pRenderbuffer);
+	glGenRenderbuffers(1, &renderbuffer);
+	glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, windowWidth, windowHeight);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, pRenderbuffer);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer);
 
 	//Unbind framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void CreateBloomBuffers(unsigned int pSwappingFramebuffers[], unsigned int pSwappingColorbuffers[])
+void CreateBloomBuffers(unsigned int swappingFramebuffers[], unsigned int swappingColorbuffers[])
 {
-	glGenFramebuffers(2, pSwappingFramebuffers);
+	glGenFramebuffers(2, swappingFramebuffers);
 
 	//Create two texture for the swapping frame buffers respectively.
-	glGenTextures(2, pSwappingColorbuffers);
+	glGenTextures(2, swappingColorbuffers);
 	for (int i = 0; i < 2; i++)
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, pSwappingFramebuffers[i]);
-		glBindTexture(GL_TEXTURE_2D, pSwappingColorbuffers[i]);
+		glBindFramebuffer(GL_FRAMEBUFFER, swappingFramebuffers[i]);
+		glBindTexture(GL_TEXTURE_2D, swappingColorbuffers[i]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
 		//No need to set mipmap option here.
@@ -555,21 +567,21 @@ void CreateBloomBuffers(unsigned int pSwappingFramebuffers[], unsigned int pSwap
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 		//Bind to framebuffer
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pSwappingColorbuffers[i], 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, swappingColorbuffers[i], 0);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void CreateRenderQuad(unsigned int& pVAO)
+void CreateRenderQuad(unsigned int& VAO)
 {
 	//Create quad to render texture
-	glGenVertexArrays(1, &pVAO);
-	glBindVertexArray(pVAO);
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
 
-	unsigned int pVBO;
-	glGenBuffers(1, &pVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, pVBO);
+	unsigned int VBO;
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(0));
