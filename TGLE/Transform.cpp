@@ -51,3 +51,7 @@ void Transform::Rotate(const float pAngle, const glm::vec3 pAxis) {
 glm::mat4 Transform::GetObjectMatrix() const {
 	return objectSpace;
 }
+
+std::string& Transform::GetName()	{
+	return name;
+}

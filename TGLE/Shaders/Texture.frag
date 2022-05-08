@@ -7,5 +7,6 @@ uniform sampler2D screenTexture;
 
 void main()
 {
-    fragColor = texture(screenTexture, vUVs);
+    //float depthValue = texture(screenTexture, vUVs).r;
+    fragColor = vec4(vec3(depthValue,0,0), 1);
 } 

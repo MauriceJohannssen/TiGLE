@@ -36,19 +36,47 @@ bool GUIStateVariables::ShowLightingSettings = false;
 
 //Post-processing structs
 struct Bloom {
-	Bloom(float threshold, int passes) : Threshold(threshold), Passes(passes) {}
+	Bloom() : bEnabled(false), Threshold(0), Passes(2) {}
+	Bloom(float threshold, int passes, bool enabled = false) : bEnabled(enabled), Threshold(threshold), Passes(passes) {}
+	bool bEnabled;
 	float Threshold;
 	int Passes;
+
+	void Render() {}
 };
 
 struct DepthOfField {
-	DepthOfField(float aperture, float imageDistance, float planeInFocus, float near, float far) : Aperture(aperture), ImageDistance(imageDistance),
-	PlaneInFocus(planeInFocus), Near(near), Far(far) {} 
+	DepthOfField() : bEnabled(false), Aperture(.5f), ImageDistance(1.f), PlaneInFocus(1.f), Near(1.0f), Far(1.f) {}
+	DepthOfField(float aperture, float imageDistance, float planeInFocus, float near, float far, bool enabled = false) : bEnabled(enabled), Aperture(aperture), ImageDistance(imageDistance),
+	PlaneInFocus(planeInFocus), Near(near), Far(far) {}
+	bool bEnabled;
 	float Aperture;
 	float ImageDistance;
 	float PlaneInFocus;
 	float Near;
 	float Far;
+
+	void SetupDof() {}
+
+	void Render(Shader& shader, glm::vec3 cameraPos, unsigned int sharpColorBuffer, unsigned int blurredColorBuffer, unsigned int vertexPosTex)
+	{
+		shader.Use();
+		shader.SetVec3("cameraPosition", cameraPos);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, sharpColorBuffer);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, blurredColorBuffer);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, vertexPosTex);
+	}
+};
+
+struct PostProcessingEffects
+{
+	PostProcessingEffects(Bloom bloom, DepthOfField dof) : Bloom(bloom), DepthOfField(dof) {}
+	Bloom Bloom;
+	DepthOfField DepthOfField;
 };
 
 //@Maurice: These vertices are being used for the rendering quad used for HDR & Bloom.
@@ -69,10 +97,11 @@ void CreateHDRBuffers(unsigned int& framebuffer, unsigned int colorbuffers[], un
 void CreateBloomBuffers(unsigned int framebuffers[], unsigned int colorbuffers[]);
 void CreateRenderQuad(unsigned int& VAO);
 void LightGui(Light& light);
+void RenderDof(std::map<std::string, Shader>& shaders, Camera& camera, unsigned int sharpColorBuffer, unsigned int blurredColorBuffer, unsigned int vertexPositionTex);
 
 void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
 	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
-	unsigned int& pVertexPositions, Bloom& pBloom);
+	unsigned int& pVertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex);
 
 
 
@@ -81,7 +110,7 @@ int main()
 	sf::ContextSettings contextSettings;
 	contextSettings.depthBits = 24;
 	contextSettings.stencilBits = 8;
-	contextSettings.antialiasingLevel = 4;
+	contextSettings.antialiasingLevel = 8;
 	contextSettings.majorVersion = 4;
 	contextSettings.minorVersion = 6;
 
@@ -91,7 +120,32 @@ int main()
 
 	PrintDebugInformation();
 
+	//Setup shadow=======================================================================================================
 
+	unsigned int shadowMapFBO;
+	glGenFramebuffers(1, &shadowMapFBO);
+
+	const unsigned int ShadowWidth = 8192;
+	const unsigned int ShadowHeight = ShadowWidth;
+
+	unsigned int depthMap;
+	glGenTextures(1, &depthMap);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, ShadowWidth, ShadowHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	float borderColor[] = { 1.f, 1.f, 1.f, 1.f };
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	//===================================================================================================================
 	//Setup buffers
 	unsigned int hdrFramebuffer;
 	unsigned int hdrColorbuffers[2];
@@ -111,6 +165,8 @@ int main()
 	std::map<std::string, Shader> shaders;
 	shaders["ColorShader"] = Shader("Shaders/Lit.vert", "Shaders/Lit.frag");
 	shaders["LightsShader"] = Shader("Shaders/Lit.vert", "Shaders/LightSource.frag");
+
+	shaders["DepthShader"] = Shader("Shaders/DepthShader.vert", "Shaders/DepthShader.frag");
 
 	Shader textureShader("Shaders/Texture.vert", "Shaders/Texture.frag");
 	textureShader.Use();
@@ -147,6 +203,12 @@ int main()
 	gameObject2.Scale(glm::vec3(2));
 	gameObjects.push_back(gameObject2);
 
+	GameObject ground("Models/Cube/Cube.obj");
+	ground.Scale(glm::vec3(10, 0.01f, 10));
+	ground.SetPosition(glm::vec3(0, -1.f, 0));
+	gameObjects.push_back(ground);
+
+
 	//Lights
 	Light light("light_1", LightType::Point, glm::vec3(0.1f, 0.05f, 1), "Models/Cube/Cube.obj", 6);
 	light.SetPosition(glm::vec3(0.5f, 0.5f, 1));
@@ -175,6 +237,7 @@ int main()
 
 	Bloom bloom(2.f, 20);
 	DepthOfField DoF(1.f, 1.f, 1.5f, 0.1f, 2.f);
+	PostProcessingEffects postProcessingEffects(bloom, DoF);
 
 	while (window.isOpen())
 	{
@@ -199,9 +262,9 @@ int main()
 
 		//Render
 		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO,
-			hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers, vertexPosition, bloom);
+			hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers, vertexPosition, postProcessingEffects, shadowMapFBO, depthMap);
 
-
+		//Save GL states before ImGui draw
 		window.pushGLStates();
 
 		//GUI
@@ -241,6 +304,19 @@ int main()
 		}
 		ImGui::EndMainMenuBar();
 
+		ImGui::Begin("Scene Hierarchy");
+		for(GameObject& gameObject : gameObjects)
+		{
+			ImGui::Text("%s", gameObject.GetName().c_str());
+		}
+
+		for(Light& light : lightSources)
+		{
+			ImGui::Text("%s", light.GetName().c_str());
+		}
+		ImGui::End();
+
+
 		//Light Settings
 		if (GUIStateVariables::ShowLightingSettings) {
 			ImGui::Begin("Lighting settings", &GUIStateVariables::ShowLightingSettings);
@@ -262,11 +338,16 @@ int main()
 		if (GUIStateVariables::ShowDoFSettings)
 		{
 			ImGui::Begin("Depth of Field Settings", &GUIStateVariables::ShowDoFSettings);
-			ImGui::SliderFloat("Aperture", &DoF.Aperture, 0.0f, 1.0f);
-			ImGui::SliderFloat("Image Distance", &DoF.ImageDistance, 0.0f, 20.0f);
-			ImGui::SliderFloat("Plane in Focus", &DoF.PlaneInFocus, 0.0f, 20.0f);
-			ImGui::SliderFloat("Near", &DoF.Near, 0.0f, 20.0f);
-			ImGui::SliderFloat("Far", &DoF.Far, 0.0f, 20.0f);
+			ImGui::Checkbox("Enabled", &postProcessingEffects.DepthOfField.bEnabled);
+			ImGui::SliderFloat("Aperture", &postProcessingEffects.DepthOfField.Aperture, 0.0f, 1.0f);
+			ImGui::SliderFloat("Image Distance", &postProcessingEffects.DepthOfField.ImageDistance, 0.0f, 20.0f);
+			ImGui::SliderFloat("Plane in Focus", &postProcessingEffects.DepthOfField.PlaneInFocus, 0.0f, 20.0f);
+			ImGui::SliderFloat("Near", &postProcessingEffects.DepthOfField.Near, 0.0f, 20.0f);
+			if(postProcessingEffects.DepthOfField.Near >= postProcessingEffects.DepthOfField.Far)
+			{
+				postProcessingEffects.DepthOfField.Far = postProcessingEffects.DepthOfField.Near + 0.01f;
+			}
+			ImGui::SliderFloat("Far", &postProcessingEffects.DepthOfField.Far, 0.0f, 20.0f);
 			ImGui::End();
 		}
 
@@ -274,8 +355,8 @@ int main()
 		if (GUIStateVariables::ShowBloomSettings)
 		{
 			ImGui::Begin("Bloom settings", &GUIStateVariables::ShowBloomSettings);
-			ImGui::SliderFloat("Threshold", &bloom.Threshold, 0.0f, 10.0f);
-			ImGui::SliderInt("Passes", &bloom.Passes, 2, 20);
+			ImGui::SliderFloat("Threshold", &postProcessingEffects.Bloom.Threshold, 0.0f, 10.0f);
+			ImGui::SliderInt("Passes", &postProcessingEffects.Bloom.Passes, 2, 20);
 			ImGui::End();
 		}
 
@@ -288,16 +369,16 @@ int main()
 		}
 
 		shaders["DofShader"].Use();
-		shaders["DofShader"].SetFloat("aperture", DoF.Aperture);
-		shaders["DofShader"].SetFloat("imageDistance", DoF.ImageDistance);
-		shaders["DofShader"].SetFloat("planeInFocus", DoF.PlaneInFocus);
-		shaders["DofShader"].SetFloat("near", DoF.Near);
-		shaders["DofShader"].SetFloat("far", DoF.Far);
+		shaders["DofShader"].SetFloat("aperture", postProcessingEffects.DepthOfField.Aperture);
+		shaders["DofShader"].SetFloat("imageDistance", postProcessingEffects.DepthOfField.ImageDistance);
+		shaders["DofShader"].SetFloat("planeInFocus", postProcessingEffects.DepthOfField.PlaneInFocus);
+		shaders["DofShader"].SetFloat("near", postProcessingEffects.DepthOfField.Near);
+		shaders["DofShader"].SetFloat("far", postProcessingEffects.DepthOfField.Far);
 
 		//Render GUI
 		ImGui::SFML::Render(window);
 
-		//Restore previous GL states
+		//Restore previous GL states after ImGui draw
 		window.popGLStates();
 
 		//Swap Buffers
@@ -332,6 +413,7 @@ void InitializeWindowContext(sf::RenderWindow& renderWindow)
 	ImGui::SFML::Init(renderWindow);
 
 	glViewport(0, 0, windowWidth, windowHeight);
+	glEnable(GL_MULTISAMPLE);
 }
 
 //@Maurice: This is supposed to print all sorts of general debug information.
@@ -367,63 +449,106 @@ void LightGui(Light& light) {
 	}
 }
 
-void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
-	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
-	unsigned int& pVertexPositions, Bloom& pBloom)
+void RenderLights(Shader& shader, std::vector<Light> lights, 
+	const glm::mat4 MVMatrix, PostProcessingEffects postProcessingEffects)
 {
-	//Bind off-screen framebuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, pHdrFramebuffer);
-	glEnable(GL_DEPTH_TEST);
 
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	for (Light& light : pLights)
+	for (Light& light : lights)
 	{
-		pShaders["LightsShader"].Use();
+		shader.Use();
 		glm::mat4 objectMatrix = light.GetObjectMatrix();
-		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * objectMatrix;
-		pShaders["LightsShader"].SetMat4("transform", MVPMatrix);
-		pShaders["LightsShader"].SetMat4("objectMatrix", objectMatrix);
-		pShaders["LightsShader"].SetVec3("lightColor", light.GetDiffuse());
-		pShaders["LightsShader"].SetFloat("intensity", light.GetIntensity());
+		const glm::mat4 MVPMatrix = MVMatrix * objectMatrix;
+		shader.SetMat4("transform", MVPMatrix);
+		shader.SetMat4("objectMatrix", objectMatrix);
+		shader.SetVec3("lightColor", light.GetDiffuse());
+		shader.SetFloat("intensity", light.GetIntensity());
 		//Bloom threshold
-		pShaders["LightsShader"].SetFloat("bloomThreshold", pBloom.Threshold);
-		light.Draw(pShaders["LightsShader"]);
+		shader.SetFloat("bloomThreshold", postProcessingEffects.Bloom.Threshold);
+		light.Draw(shader);
 	}
+}
 
-
-	for (GameObject& gameObject : pGameObjects)
+void RenderObjects(Shader& shader, std::vector<GameObject> gameObjects, std::vector<Light>& lights, 
+	const glm::mat4 MVMatrix, const glm::mat4 lightSpaceMatrix, unsigned int& depthMap, Camera& camera, PostProcessingEffects postProcessingEffects)
+{
+	for (GameObject& gameObject : gameObjects)
 	{
 		glm::mat4 objectMatrix = gameObject.GetObjectMatrix();
-		pShaders["ColorShader"].Use();
-		const glm::mat4 MVPMatrix = pProjectionMatrix * pViewMatrix * objectMatrix;
-		pShaders["ColorShader"].SetMat4("transform", MVPMatrix);
-		pShaders["ColorShader"].SetMat4("objectMatrix", objectMatrix);
-		pShaders["ColorShader"].SetVec3("cameraPosition", pCamera.GetPosition());
+		shader.Use();
+		const glm::mat4 MVPMatrix = MVMatrix * objectMatrix;
+		shader.SetMat4("transform", MVPMatrix);
+		shader.SetMat4("objectMatrix", objectMatrix);
+		shader.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
+		shader.SetVec3("cameraPosition", camera.GetPosition());
 
 		//Bloom threshold
-		pShaders["ColorShader"].SetFloat("bloomThreshold", pBloom.Threshold);
+		shader.SetFloat("bloomThreshold", postProcessingEffects.Bloom.Threshold);
+
+		shader.SetInt("shadowMap", 15);
+		glActiveTexture(GL_TEXTURE15);
+		glBindTexture(GL_TEXTURE_2D, depthMap);
 
 		//This is inefficient and just for testing purposes!
 		//Use uniform buffer objects or classes.
 
-		for (unsigned int i = 0; i < pLights.size(); i++)
+		for (unsigned int i = 0; i < lights.size(); i++)
 		{
-			Light light = pLights.at(i);
+			Light light = lights.at(i);
 			std::string str = std::to_string(i);
-			pShaders["ColorShader"].SetVec3("pointLights[" + str + "].position", light.GetPosition());
-			pShaders["ColorShader"].SetVec3("pointLights[" + str + "].ambient", light.GetAmbient());
-			pShaders["ColorShader"].SetVec3("pointLights[" + str + "].diffuse", light.GetDiffuse());
-			pShaders["ColorShader"].SetVec3("pointLights[" + str + "].specular", light.GetSpecular());
-			pShaders["ColorShader"].SetFloat("pointLights[" + str + "].constant", 1.0f);
-			pShaders["ColorShader"].SetFloat("pointLights[" + str + "].linear", 0.07f);
-			pShaders["ColorShader"].SetFloat("pointLights[" + str + "].quadratic", 0.3f);
-			pShaders["ColorShader"].SetFloat("pointLights[" + str + "].intensity", light.GetIntensity());
+			shader.SetVec3("pointLights[" + str + "].position", light.GetPosition());
+			shader.SetVec3("pointLights[" + str + "].ambient", light.GetAmbient());
+			shader.SetVec3("pointLights[" + str + "].diffuse", light.GetDiffuse());
+			shader.SetVec3("pointLights[" + str + "].specular", light.GetSpecular());
+			shader.SetFloat("pointLights[" + str + "].constant", 1.0f);
+			shader.SetFloat("pointLights[" + str + "].linear", 0.07f);
+			shader.SetFloat("pointLights[" + str + "].quadratic", 0.3f);
+			shader.SetFloat("pointLights[" + str + "].intensity", light.GetIntensity());
 		}
 
-		gameObject.Draw(pShaders["ColorShader"]);
+		gameObject.Draw(shader);
 	}
+}
+
+void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
+	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
+	unsigned int& pVertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex)
+{
+
+	float near = 0.0f;
+	float far = 25.f;
+
+	glm::mat4 lightProjection = glm::ortho(-10.f, 10.f, -10.f, 10.f, near, far);
+	glm::mat4 lightView = glm::lookAt(glm::vec3(8,8,-8), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+	glViewport(0,0, 8192, 8192);
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowBuffer);
+	glEnable(GL_DEPTH_TEST);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glCullFace(GL_FRONT);
+
+	for (GameObject& gameObject : pGameObjects)
+	{
+		glm::mat4 objectMatrix = gameObject.GetObjectMatrix();
+		pShaders["DepthShader"].Use();
+		pShaders["DepthShader"].SetMat4("model", objectMatrix);
+		pShaders["DepthShader"].SetMat4("lightSpaceMatrix", lightSpaceMatrix);
+		gameObject.Draw(pShaders["DepthShader"]);
+	}
+
+	glViewport(0, 0, windowWidth, windowHeight);
+	glCullFace(GL_BACK);
+
+	//=================================================================================================================================
+
+	//Bind off-screen framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, pHdrFramebuffer);
+
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	RenderLights(pShaders["LightsShader"], pLights, pProjectionMatrix * pViewMatrix, postProcessingEffects);
+	RenderObjects(pShaders["ColorShader"], pGameObjects, pLights, pProjectionMatrix * pViewMatrix, 
+		lightSpaceMatrix, depthTex, pCamera, postProcessingEffects);
 
 	//Render with swapping buffers to create bloom.
 	bool horizontal = true;
@@ -433,7 +558,7 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	glBindVertexArray(pQuadVAO);
 	glDisable(GL_DEPTH_TEST);
 
-	for (int i = 0; i < pBloom.Passes; i++)
+	for (int i = 0; i < postProcessingEffects.Bloom.Passes; i++)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
 		pShaders["BlurShader"].SetInt("horizontal", horizontal);
@@ -466,9 +591,8 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	pShaders["BlurShader"].Use();
 	horizontal = true;
 	firstIteration = true;
-	int passes = 10;
 
-	for (int i = 0; i < passes; i++)
+	for (int i = 0; i < postProcessingEffects.Bloom.Passes; i++)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
 		pShaders["BlurShader"].SetInt("horizontal", horizontal);
@@ -484,19 +608,21 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 		}
 	}
 
-	pShaders["DofShader"].Use();
-	pShaders["DofShader"].SetVec3("cameraPosition", pCamera.GetPosition());
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, pHdrColorbuffers[1]);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, pBloomColorbuffers[0]);
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, pVertexPositions);
-
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	if(postProcessingEffects.DepthOfField.bEnabled)
+	{
+		postProcessingEffects.DepthOfField.Render(pShaders["DofShader"],
+			pCamera.GetPosition(), pHdrColorbuffers[1], pBloomColorbuffers[0], pVertexPositions); 
+	}
+	else
+	{
+		pShaders["TextureShader"].Use();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, depthTex);
+	}
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 	glBindVertexArray(0);

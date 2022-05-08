@@ -94,5 +94,11 @@
     <None Include="Shaders\Texture.vert">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="Shaders\DepthShader.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Shaders\DepthShader.vert">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

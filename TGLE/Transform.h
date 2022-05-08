@@ -25,6 +25,8 @@ public:
 
 	glm::mat4 GetObjectMatrix() const;
 
+	std::string& GetName();
+
 private:
 	static unsigned int ObjectCount;
 	std::string name;

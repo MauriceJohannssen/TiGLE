@@ -161,6 +161,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\BloomTonemapping.frag" />
+    <None Include="Shaders\DepthShader.frag" />
+    <None Include="Shaders\DepthShader.vert" />
     <None Include="Shaders\DoFShader.frag" />
     <None Include="Shaders\GaussianBlur.frag" />
     <None Include="Shaders\LightSource.frag" />

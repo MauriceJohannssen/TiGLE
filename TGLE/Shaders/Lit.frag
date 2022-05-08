@@ -8,6 +8,9 @@ layout(location = 2) out vec4 vertexPosition;
 in vec2 vUVs;
 in vec3 vNormal;
 in vec3 vFragPosition;
+in vec4 vFragLightPosition;
+
+uniform sampler2D shadowMap;
 
 //Material
 struct Material {
@@ -43,6 +46,7 @@ uniform vec3 cameraPosition;
 uniform float bloomThreshold;
 
 vec3 CalculateDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition, vec3 pViewDirection);
+float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirection);
 
 void main() {
 	vec3 finalColor = vec3(0,0,0);
@@ -86,5 +90,33 @@ vec3 CalculateDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPo
 	float distanceLightFrag = length(pointLight.position - vFragPosition);
 	float attenuation = 1.0 / (pointLight.constant + pointLight.linear * distanceLightFrag + pointLight.quadratic * (distanceLightFrag * distanceLightFrag));
 
-	return (ambient + diffuse + specular) * attenuation * pointLight.intensity;
+	float shadowValue = CalculateShadow(vFragLightPosition, pNormal, lightDirection);
+	return (ambient + ((1 - shadowValue) * (diffuse + specular))) * attenuation * pointLight.intensity;
+}
+
+float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirection){
+	vec3 coords = fragPositionLightSpace.xyz / fragPositionLightSpace.w;
+	coords = coords * 0.5 + 0.5f;
+
+	float closestDepth = texture(shadowMap, coords.xy).r;
+	float currentDepth = coords.z;
+	if(currentDepth > 1.0){
+		return 0.0;
+	}
+
+	float bias = max(0.05 * (1.0 - dot(normal, lightDirection)), 0.003);
+
+	float shadow = 0.0;
+	vec2 texelSize = 0.5 / textureSize(shadowMap, 0);
+
+	//PCF
+	for(int x = -2; x <= 2; x++){
+		for(int y = -2; y <= 2; y++){
+			float pcfDepth = texture(shadowMap, coords.xy + vec2(x,y) * texelSize).r;
+			shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+		}
+	}
+
+	shadow /= 25;
+	return shadow;
 }
