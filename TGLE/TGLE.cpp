@@ -254,6 +254,7 @@ int main()
 
 	PostProcessingEffects postProcessingEffects(Bloom(2.0f, 20), DepthOfField(1.0f, 1.0f, 1.5f, 0.1f, 2.0f));
 
+	//Main Engine Loop=========================================================================================================
 	while (window.isOpen())
 	{
 		//Update Time
@@ -282,7 +283,7 @@ int main()
 		//Save GL states before ImGui draw
 		window.pushGLStates();
 
-		//GUI
+		//GUI=====================================================================================================================
 		ImGui::SFML::Update(window, deltaTime);
 
 		//Menu bar
@@ -295,6 +296,7 @@ int main()
 			}
 			ImGui::EndMenu();
 		}
+
 		if (ImGui::BeginMenu("Lighting"))
 		{
 			if (ImGui::MenuItem("Edit Lights"))
@@ -303,6 +305,7 @@ int main()
 			}
 			ImGui::EndMenu();
 		}
+
 		if (ImGui::BeginMenu("Post Processing"))
 		{
 			if (ImGui::MenuItem("Depth Of Field"))
@@ -311,6 +314,7 @@ int main()
 				GUIStateVariables::ShowBloomSettings = true;
 			ImGui::EndMenu();
 		}
+
 		if (ImGui::BeginMenu("About"))
 		{
 			if (ImGui::MenuItem("Credits"))
@@ -330,7 +334,6 @@ int main()
 			ImGui::Text("%s", light.GetName().c_str());
 		}
 		ImGui::End();
-
 
 		//Light Settings
 		if (GUIStateVariables::ShowLightingSettings) {

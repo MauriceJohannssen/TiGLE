@@ -4,11 +4,10 @@ unsigned int Transform::ObjectCount = 0;
 
 Transform::Transform() : objectSpace(glm::mat4(1)) {
 	//TODO: This could create naming conflicts.
-	name = "gameObject_" + ObjectCount++;
+	name = "GameObject_" + std::to_string(ObjectCount++);
 }
 
 Transform::Transform(std::string& pName) : name(pName), objectSpace(glm::mat4(1)) {
-
 }
 
 Transform::~Transform() {
