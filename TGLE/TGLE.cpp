@@ -18,8 +18,8 @@
 #include "imgui-SFML.h"
 
 //Global window settings
-int windowWidth = 1600;
-int windowHeight = 900;
+constexpr int windowWidth = 1600;
+constexpr int windowHeight = 900;
 
 //GUI state variables
 struct GUIStateVariables {
@@ -34,11 +34,11 @@ bool GUIStateVariables::ShowDoFSettings = false;
 bool GUIStateVariables::ShowBloomSettings = false;
 bool GUIStateVariables::ShowLightingSettings = false;
 
-//Post-processing structs
+//Post-processing
 struct Bloom {
-	Bloom() : bEnabled(false), Threshold(0), Passes(2) {}
-	Bloom(float threshold, int passes, bool enabled = false) : bEnabled(enabled), Threshold(threshold), Passes(passes) {}
-	bool bEnabled;
+	Bloom() : IsEnabled(false), Threshold(0.0f), Passes(2) {}
+	Bloom(float threshold, int passes, bool enabled = false) : IsEnabled(enabled), Threshold(threshold), Passes(passes) {}
+	bool IsEnabled;
 	float Threshold;
 	int Passes;
 
@@ -46,10 +46,12 @@ struct Bloom {
 };
 
 struct DepthOfField {
-	DepthOfField() : bEnabled(false), Aperture(.5f), ImageDistance(1.f), PlaneInFocus(1.f), Near(1.0f), Far(1.f) {}
-	DepthOfField(float aperture, float imageDistance, float planeInFocus, float near, float far, bool enabled = false) : bEnabled(enabled), Aperture(aperture), ImageDistance(imageDistance),
+	DepthOfField() : IsEnabled(false), Aperture(0.5f), ImageDistance(1.0f), PlaneInFocus(1.0f), Near(1.0f), Far(1.0f) {}
+	DepthOfField(float aperture, float imageDistance, float planeInFocus, float near, float far, bool enabled = false) 
+		: IsEnabled(enabled), Aperture(aperture), ImageDistance(imageDistance),
 	PlaneInFocus(planeInFocus), Near(near), Far(far) {}
-	bool bEnabled;
+
+	bool IsEnabled;
 	float Aperture;
 	float ImageDistance;
 	float PlaneInFocus;
@@ -72,14 +74,27 @@ struct DepthOfField {
 	}
 };
 
-struct PostProcessingEffects
+class PostProcessingEffects
 {
-	PostProcessingEffects(Bloom bloom, DepthOfField dof) : Bloom(bloom), DepthOfField(dof) {}
+public:
+	PostProcessingEffects(Bloom bloom, DepthOfField dof) : Bloom(bloom), DepthOfField(dof) {
+		
+	}
+
+	Bloom& GetBloom() {
+		return Bloom;
+	}
+
+	DepthOfField& GetDoF() {
+		return DepthOfField;
+	}
+
+private:
 	Bloom Bloom;
 	DepthOfField DepthOfField;
 };
 
-//@Maurice: These vertices are being used for the rendering quad used for HDR & Bloom.
+//These vertices are being used for the rendering quad used for HDR & Bloom.
 float quadVertices[] = {
 	-1.0f,  1.0f,  0.0f, 1.0f,
 	-1.0f, -1.0f,  0.0f, 0.0f,
@@ -89,6 +104,8 @@ float quadVertices[] = {
 	 1.0f, -1.0f,  1.0f, 0.0f,
 	 1.0f,  1.0f,  1.0f, 1.0f
 };
+
+//=====================================================================================================================
 
 void InitializeWindowContext(sf::RenderWindow& renderWindow);
 void PrintDebugInformation();
@@ -235,9 +252,7 @@ int main()
 	mainCamera.SetPosition(glm::vec3(0, 0, 3));
 	mainCamera.SetForward(glm::vec3(0, 0, -1));
 
-	Bloom bloom(2.f, 20);
-	DepthOfField DoF(1.f, 1.f, 1.5f, 0.1f, 2.f);
-	PostProcessingEffects postProcessingEffects(bloom, DoF);
+	PostProcessingEffects postProcessingEffects(Bloom(2.0f, 20), DepthOfField(1.0f, 1.0f, 1.5f, 0.1f, 2.0f));
 
 	while (window.isOpen())
 	{
@@ -337,26 +352,28 @@ int main()
 		//Depth of Field settings
 		if (GUIStateVariables::ShowDoFSettings)
 		{
+			DepthOfField& DoF = postProcessingEffects.GetDoF();
 			ImGui::Begin("Depth of Field Settings", &GUIStateVariables::ShowDoFSettings);
-			ImGui::Checkbox("Enabled", &postProcessingEffects.DepthOfField.bEnabled);
-			ImGui::SliderFloat("Aperture", &postProcessingEffects.DepthOfField.Aperture, 0.0f, 1.0f);
-			ImGui::SliderFloat("Image Distance", &postProcessingEffects.DepthOfField.ImageDistance, 0.0f, 20.0f);
-			ImGui::SliderFloat("Plane in Focus", &postProcessingEffects.DepthOfField.PlaneInFocus, 0.0f, 20.0f);
-			ImGui::SliderFloat("Near", &postProcessingEffects.DepthOfField.Near, 0.0f, 20.0f);
-			if(postProcessingEffects.DepthOfField.Near >= postProcessingEffects.DepthOfField.Far)
+			ImGui::Checkbox("Enabled", &DoF.IsEnabled);
+			ImGui::SliderFloat("Aperture", &DoF.Aperture, 0.0f, 1.0f);
+			ImGui::SliderFloat("Image Distance", &DoF.ImageDistance, 0.0f, 20.0f);
+			ImGui::SliderFloat("Plane in Focus", &DoF.PlaneInFocus, 0.0f, 20.0f);
+			ImGui::SliderFloat("Near", &DoF.Near, 0.0f, 20.0f);
+			if(DoF.Near >= DoF.Far)
 			{
-				postProcessingEffects.DepthOfField.Far = postProcessingEffects.DepthOfField.Near + 0.01f;
+				DoF.Far = DoF.Near + 0.01f;
 			}
-			ImGui::SliderFloat("Far", &postProcessingEffects.DepthOfField.Far, 0.0f, 20.0f);
+			ImGui::SliderFloat("Far", &DoF.Far, 0.0f, 20.0f);
 			ImGui::End();
 		}
 
 		//Bloom Settings
 		if (GUIStateVariables::ShowBloomSettings)
 		{
+			Bloom& bloom = postProcessingEffects.GetBloom();
 			ImGui::Begin("Bloom settings", &GUIStateVariables::ShowBloomSettings);
-			ImGui::SliderFloat("Threshold", &postProcessingEffects.Bloom.Threshold, 0.0f, 10.0f);
-			ImGui::SliderInt("Passes", &postProcessingEffects.Bloom.Passes, 2, 20);
+			ImGui::SliderFloat("Threshold", &bloom.Threshold, 0.0f, 10.0f);
+			ImGui::SliderInt("Passes", &bloom.Passes, 2, 20);
 			ImGui::End();
 		}
 
@@ -368,12 +385,14 @@ int main()
 			ImGui::End();
 		}
 
+		DepthOfField& DoF = postProcessingEffects.GetDoF();
 		shaders["DofShader"].Use();
-		shaders["DofShader"].SetFloat("aperture", postProcessingEffects.DepthOfField.Aperture);
-		shaders["DofShader"].SetFloat("imageDistance", postProcessingEffects.DepthOfField.ImageDistance);
-		shaders["DofShader"].SetFloat("planeInFocus", postProcessingEffects.DepthOfField.PlaneInFocus);
-		shaders["DofShader"].SetFloat("near", postProcessingEffects.DepthOfField.Near);
-		shaders["DofShader"].SetFloat("far", postProcessingEffects.DepthOfField.Far);
+		shaders["DofShader"].SetFloat("aperture", DoF.Aperture);
+		shaders["DofShader"].SetFloat("imageDistance", DoF.ImageDistance);
+		shaders["DofShader"].SetFloat("planeInFocus", DoF.PlaneInFocus);
+		shaders["DofShader"].SetFloat("near", DoF.Near);
+		shaders["DofShader"].SetFloat("far", DoF.Far);
+
 
 		//Render GUI
 		ImGui::SFML::Render(window);
@@ -463,7 +482,7 @@ void RenderLights(Shader& shader, std::vector<Light> lights,
 		shader.SetVec3("lightColor", light.GetDiffuse());
 		shader.SetFloat("intensity", light.GetIntensity());
 		//Bloom threshold
-		shader.SetFloat("bloomThreshold", postProcessingEffects.Bloom.Threshold);
+		shader.SetFloat("bloomThreshold", postProcessingEffects.GetBloom().Threshold);
 		light.Draw(shader);
 	}
 }
@@ -482,7 +501,7 @@ void RenderObjects(Shader& shader, std::vector<GameObject> gameObjects, std::vec
 		shader.SetVec3("cameraPosition", camera.GetPosition());
 
 		//Bloom threshold
-		shader.SetFloat("bloomThreshold", postProcessingEffects.Bloom.Threshold);
+		shader.SetFloat("bloomThreshold", postProcessingEffects.GetBloom().Threshold);
 
 		shader.SetInt("shadowMap", 15);
 		glActiveTexture(GL_TEXTURE15);
@@ -558,7 +577,7 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	glBindVertexArray(pQuadVAO);
 	glDisable(GL_DEPTH_TEST);
 
-	for (int i = 0; i < postProcessingEffects.Bloom.Passes; i++)
+	for (int i = 0; i < postProcessingEffects.GetBloom().Passes; i++)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
 		pShaders["BlurShader"].SetInt("horizontal", horizontal);
@@ -592,7 +611,7 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	horizontal = true;
 	firstIteration = true;
 
-	for (int i = 0; i < postProcessingEffects.Bloom.Passes; i++)
+	for (int i = 0; i < postProcessingEffects.GetBloom().Passes; i++)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
 		pShaders["BlurShader"].SetInt("horizontal", horizontal);
@@ -612,9 +631,9 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	if(postProcessingEffects.DepthOfField.bEnabled)
+	if(postProcessingEffects.GetDoF().IsEnabled)
 	{
-		postProcessingEffects.DepthOfField.Render(pShaders["DofShader"],
+		postProcessingEffects.GetDoF().Render(pShaders["DofShader"],
 			pCamera.GetPosition(), pHdrColorbuffers[1], pBloomColorbuffers[0], pVertexPositions); 
 	}
 	else
