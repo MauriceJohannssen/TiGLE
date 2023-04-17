@@ -484,6 +484,7 @@ void RenderLights(Shader& shader, std::vector<Light> lights,
 		shader.SetMat4("objectMatrix", objectMatrix);
 		shader.SetVec3("lightColor", light.GetDiffuse());
 		shader.SetFloat("intensity", light.GetIntensity());
+		
 		//Bloom threshold
 		shader.SetFloat("bloomThreshold", postProcessingEffects.GetBloom().Threshold);
 		light.Draw(shader);
@@ -531,62 +532,65 @@ void RenderObjects(Shader& shader, std::vector<GameObject> gameObjects, std::vec
 	}
 }
 
-void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
-	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
-	unsigned int& pVertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex)
+void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Light>& lights, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix,
+	std::map<std::string, Shader> shaders, unsigned int quadVAO, unsigned int HDRFramebuffer, unsigned int HDRColorbuffers[], unsigned int bloomFramebuffers[], unsigned int bloomColorbuffers[],
+	unsigned int& vertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex)
 {
-
 	float near = 0.0f;
 	float far = 25.f;
 
 	glm::mat4 lightProjection = glm::ortho(-10.f, 10.f, -10.f, 10.f, near, far);
 	glm::mat4 lightView = glm::lookAt(glm::vec3(8,8,-8), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 	glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+	
+	
+	//Depth Buffer=============================================================================================================
 	glViewport(0,0, 8192, 8192);
 	glBindFramebuffer(GL_FRAMEBUFFER, shadowBuffer);
 	glEnable(GL_DEPTH_TEST);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glCullFace(GL_FRONT);
 
-	for (GameObject& gameObject : pGameObjects)
+	for (GameObject& gameObject : gameObjects)
 	{
 		glm::mat4 objectMatrix = gameObject.GetObjectMatrix();
-		pShaders["DepthShader"].Use();
-		pShaders["DepthShader"].SetMat4("model", objectMatrix);
-		pShaders["DepthShader"].SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-		gameObject.Draw(pShaders["DepthShader"]);
+		shaders["DepthShader"].Use();
+		shaders["DepthShader"].SetMat4("model", objectMatrix);
+		shaders["DepthShader"].SetMat4("lightSpaceMatrix", lightSpaceMatrix);
+		gameObject.Draw(shaders["DepthShader"]);
 	}
 
 	glViewport(0, 0, windowWidth, windowHeight);
 	glCullFace(GL_BACK);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	//=================================================================================================================================
+	//=========================================================================================================================
 
 	//Bind off-screen framebuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, pHdrFramebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, HDRFramebuffer);
 
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	RenderLights(pShaders["LightsShader"], pLights, pProjectionMatrix * pViewMatrix, postProcessingEffects);
-	RenderObjects(pShaders["ColorShader"], pGameObjects, pLights, pProjectionMatrix * pViewMatrix, 
-		lightSpaceMatrix, depthTex, pCamera, postProcessingEffects);
+	RenderLights(shaders["LightsShader"], lights, projectionMatrix * viewMatrix, postProcessingEffects);
+	RenderObjects(shaders["ColorShader"], gameObjects, lights, projectionMatrix * viewMatrix, 
+		lightSpaceMatrix, depthTex, camera, postProcessingEffects);
 
 	//Render with swapping buffers to create bloom.
 	bool horizontal = true;
 	bool firstIteration = true;
-	pShaders["BlurShader"].Use();
+	shaders["BlurShader"].Use();
 
-	glBindVertexArray(pQuadVAO);
+	glBindVertexArray(quadVAO);
 	glDisable(GL_DEPTH_TEST);
 
 	for (int i = 0; i < postProcessingEffects.GetBloom().Passes; i++)
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
-		pShaders["BlurShader"].SetInt("horizontal", horizontal);
+		glBindFramebuffer(GL_FRAMEBUFFER, bloomFramebuffers[horizontal]);
+		shaders["BlurShader"].SetInt("horizontal", horizontal);
 
 		//On first iteration bind the hdr colorbuffer, otherwise no starting texture is provided.
-		glBindTexture(GL_TEXTURE_2D, firstIteration ? pHdrColorbuffers[1] : pBloomColorbuffers[!horizontal]);
+		glBindTexture(GL_TEXTURE_2D, firstIteration ? HDRColorbuffers[1] : bloomColorbuffers[!horizontal]);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 
 		horizontal = !horizontal;
@@ -597,30 +601,30 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	}
 
 	//1. Render sharp bloom image into framebuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, pHdrFramebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, HDRFramebuffer);
 
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	pShaders["BloomShader"].Use();
+	shaders["BloomShader"].Use();
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, pHdrColorbuffers[0]);
+	glBindTexture(GL_TEXTURE_2D, HDRColorbuffers[0]);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, pBloomColorbuffers[horizontal]);
+	glBindTexture(GL_TEXTURE_2D, bloomColorbuffers[horizontal]);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 
 
 	//2. Blur whole image
-	pShaders["BlurShader"].Use();
+	shaders["BlurShader"].Use();
 	horizontal = true;
 	firstIteration = true;
 
 	for (int i = 0; i < postProcessingEffects.GetBloom().Passes; i++)
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, pBloomFramebuffer[horizontal]);
-		pShaders["BlurShader"].SetInt("horizontal", horizontal);
+		glBindFramebuffer(GL_FRAMEBUFFER, bloomFramebuffers[horizontal]);
+		shaders["BlurShader"].SetInt("horizontal", horizontal);
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, firstIteration ? pHdrColorbuffers[1] : pBloomColorbuffers[!horizontal]);
+		glBindTexture(GL_TEXTURE_2D, firstIteration ? HDRColorbuffers[1] : bloomColorbuffers[!horizontal]);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 
 		horizontal = !horizontal;
@@ -631,20 +635,18 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	if(postProcessingEffects.GetDoF().IsEnabled)
 	{
-		postProcessingEffects.GetDoF().Render(pShaders["DofShader"],
-			pCamera.GetPosition(), pHdrColorbuffers[1], pBloomColorbuffers[0], pVertexPositions); 
+		postProcessingEffects.GetDoF().Render(shaders["DofShader"],
+			camera.GetPosition(), HDRColorbuffers[1], bloomColorbuffers[0], vertexPositions); 
 	}
-	else
-	{
-		pShaders["TextureShader"].Use();
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, depthTex);
-	}
+	//else
+	//{
+	//	pShaders["TextureShader"].Use();
+	//	glActiveTexture(GL_TEXTURE0);
+	//	glBindTexture(GL_TEXTURE_2D, depthTex);
+	//}
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 	glBindVertexArray(0);
