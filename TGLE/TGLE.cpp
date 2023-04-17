@@ -589,7 +589,7 @@ void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Li
 		glBindFramebuffer(GL_FRAMEBUFFER, bloomFramebuffers[horizontal]);
 		shaders["BlurShader"].SetInt("horizontal", horizontal);
 
-		//On first iteration bind the hdr colorbuffer, otherwise no starting texture is provided.
+		//On first iteration bind the HDR colorbuffer, otherwise no starting texture is provided.
 		glBindTexture(GL_TEXTURE_2D, firstIteration ? HDRColorbuffers[1] : bloomColorbuffers[!horizontal]);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 
@@ -641,12 +641,12 @@ void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Li
 		postProcessingEffects.GetDoF().Render(shaders["DofShader"],
 			camera.GetPosition(), HDRColorbuffers[1], bloomColorbuffers[0], vertexPositions); 
 	}
-	//else
-	//{
-	//	pShaders["TextureShader"].Use();
-	//	glActiveTexture(GL_TEXTURE0);
-	//	glBindTexture(GL_TEXTURE_2D, depthTex);
-	//}
+	else
+	{
+		shaders["TextureShader"].Use();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, HDRColorbuffers[1]);
+	}
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
 	glBindVertexArray(0);
