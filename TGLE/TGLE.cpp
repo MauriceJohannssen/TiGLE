@@ -4,7 +4,7 @@
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <iostream>
 #include "Input.h"
-#include "Material.h"
+//#include "Material.h"
 #include "Shader.h"
 #include "GameObject.h"
 #include <glm/glm.hpp>
@@ -16,6 +16,8 @@
 #include "Light.h"
 #include "imgui.h"
 #include "imgui-SFML.h"
+#include <ctime>
+#include <cstdlib>
 
 //Global window settings
 constexpr int windowWidth = 1600;
@@ -120,8 +122,6 @@ void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<
 	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
 	unsigned int& pVertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex);
 
-
-
 int main()
 {
 	sf::ContextSettings contextSettings;
@@ -137,13 +137,14 @@ int main()
 
 	PrintDebugInformation();
 
+	srand(time(nullptr));
+	
 	//Setup shadow=======================================================================================================
-
 	unsigned int shadowMapFBO;
 	glGenFramebuffers(1, &shadowMapFBO);
 
 	const unsigned int ShadowWidth = 8192;
-	const unsigned int ShadowHeight = ShadowWidth;
+	const unsigned int ShadowHeight = 8192;
 
 	unsigned int depthMap;
 	glGenTextures(1, &depthMap);
@@ -221,24 +222,43 @@ int main()
 	gameObjects.push_back(gameObject2);
 
 	GameObject ground("Models/Cube/Cube.obj");
-	ground.Scale(glm::vec3(10, 0.01f, 10));
-	ground.SetPosition(glm::vec3(0, -1.f, 0));
+	ground.Scale(glm::vec3(50, 0.01f, 12));
+	ground.SetPosition(glm::vec3(40, -1.0f, 0));
 	gameObjects.push_back(ground);
 
+	float z = 7.0f;
+	for (unsigned row = 0; row < 2; ++row) {
+		for (unsigned int i = 0; i < 10; ++i) {
+			GameObject house("Models/House/House.obj");
+			house.SetPosition(glm::vec3(8.0f * i, -1.0f, z));
+			float randRot = row * 110.0f + rand() % 5;
+			std::cout << randRot << std::endl;
+			house.Rotate(randRot, glm::vec3(0, 1, 0));
+			gameObjects.push_back(house);
+		}
+
+		z *= -1;
+	}
 
 	//Lights
-	Light light("light_1", LightType::Point, glm::vec3(0.1f, 0.05f, 1), "Models/Cube/Cube.obj", 6);
-	light.SetPosition(glm::vec3(0.5f, 0.5f, 1));
+	Light sun("sun", LightType::Directional, glm::vec3(1, 1, 1), "Models/Cube/Cube.obj", 2.0f);
+	sun.SetPosition(glm::vec3(-15,10,20));
+	sun.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+	sun.Scale(glm::vec3(0.1f));
+	lightSources.push_back(sun);
+
+	Light light("light_1", LightType::Point, glm::vec3(0.1f, 0.05f, 1), "Models/Cube/Cube.obj", 30);
+	light.SetPosition(glm::vec3(50.0f, 8.0f, 0.0f));
 	light.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light);
 
-	Light light2("light_2", LightType::Point, glm::vec3(1, 0, 1), "Models/Cube/Cube.obj", 3);
-	light2.SetPosition(glm::vec3(0.2f, 0.5, -1));
+	Light light2("light_2", LightType::Point, glm::vec3(1, 0, 1), "Models/Cube/Cube.obj", 25);
+	light2.SetPosition(glm::vec3(25.0f, 4.0f, 0.0f));
 	light2.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light2);
 
-	Light light3("light_3", LightType::Point, glm::vec3(0.2f, 1, 0), "Models/Cube/Cube.obj", 2);
-	light3.SetPosition(glm::vec3(0.3f, 0, 0));
+	Light light3("light_3", LightType::Point, glm::vec3(0.7f, 0.2f, 0.7f), "Models/Cube/Cube.obj", 10);
+	light3.SetPosition(glm::vec3(0.0f, 2.0f, 0.0f));
 	light3.Scale(glm::vec3(0.05f));
 	lightSources.push_back(light3);
 
@@ -339,15 +359,15 @@ int main()
 		if (GUIStateVariables::ShowLightingSettings) {
 			ImGui::Begin("Lighting settings", &GUIStateVariables::ShowLightingSettings);
 			if (ImGui::TreeNode("Light 1")) {
-				LightGui(lightSources.at(0));
-				ImGui::TreePop();
-			}
-			if (ImGui::TreeNode("Light 2")) {
 				LightGui(lightSources.at(1));
 				ImGui::TreePop();
 			}
-			if (ImGui::TreeNode("Light 3")) {
+			if (ImGui::TreeNode("Light 2")) {
 				LightGui(lightSources.at(2));
+				ImGui::TreePop();
+			}
+			if (ImGui::TreeNode("Light 3")) {
+				LightGui(lightSources.at(3));
 				ImGui::TreePop();
 			}
 		}
@@ -513,19 +533,36 @@ void RenderObjects(Shader& shader, std::vector<GameObject> gameObjects, std::vec
 
 		//This is inefficient and just for testing purposes!
 		//Use uniform buffer objects or classes.
-
 		for (unsigned int i = 0; i < lights.size(); i++)
 		{
 			Light light = lights.at(i);
-			std::string str = std::to_string(i);
-			shader.SetVec3("pointLights[" + str + "].position", light.GetPosition());
-			shader.SetVec3("pointLights[" + str + "].ambient", light.GetAmbient());
-			shader.SetVec3("pointLights[" + str + "].diffuse", light.GetDiffuse());
-			shader.SetVec3("pointLights[" + str + "].specular", light.GetSpecular());
-			shader.SetFloat("pointLights[" + str + "].constant", 1.0f);
-			shader.SetFloat("pointLights[" + str + "].linear", 0.07f);
-			shader.SetFloat("pointLights[" + str + "].quadratic", 0.3f);
-			shader.SetFloat("pointLights[" + str + "].intensity", light.GetIntensity());
+			std::string str = std::to_string(i - 1);
+
+			switch (light.GetLightType()) {
+			case LightType::Point:
+				shader.SetVec3("pointLights[" + str + "].position", light.GetPosition());
+				shader.SetVec3("pointLights[" + str + "].ambient", light.GetAmbient());
+				shader.SetVec3("pointLights[" + str + "].diffuse", light.GetDiffuse());
+				shader.SetVec3("pointLights[" + str + "].specular", light.GetSpecular());
+				shader.SetFloat("pointLights[" + str + "].constant", 1.0f);
+				shader.SetFloat("pointLights[" + str + "].linear", 0.07f);
+				shader.SetFloat("pointLights[" + str + "].quadratic", 0.3f);
+				shader.SetFloat("pointLights[" + str + "].intensity", light.GetIntensity());
+				break;
+			
+
+			case LightType::Directional:
+				shader.SetVec3("directionalLight.direction", light.GetForward());
+				shader.SetVec3("directionalLight.ambient", light.GetAmbient());
+				shader.SetVec3("directionalLight.diffuse", light.GetDiffuse());
+				shader.SetVec3("directionalLight.specular", light.GetSpecular());
+				shader.SetFloat("directionalLight.intensity", light.GetIntensity());
+			break;
+
+			default:
+				std::cout << "Hit default case for light type." << std::endl;
+				break;
+			}
 		}
 
 		gameObject.Draw(shader);
@@ -537,10 +574,10 @@ void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Li
 	unsigned int& vertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex)
 {
 	float near = 0.0f;
-	float far = 25.f;
+	float far = 50.0f;
 
-	glm::mat4 lightProjection = glm::ortho(-10.f, 10.f, -10.f, 10.f, near, far);
-	glm::mat4 lightView = glm::lookAt(glm::vec3(8,8,-8), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	glm::mat4 lightProjection = glm::ortho(-25.f, 25.f, -25.f, 25.f, near, far);
+	glm::mat4 lightView = glm::lookAt(lights[0].GetPosition(), lights[0].GetForward(), glm::vec3(0, 1, 0));
 	glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 	
 	
@@ -548,8 +585,9 @@ void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Li
 	glViewport(0,0, 8192, 8192);
 	glBindFramebuffer(GL_FRAMEBUFFER, shadowBuffer);
 	glEnable(GL_DEPTH_TEST);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glCullFace(GL_FRONT);
+	//glEnable(GL_CULL_FACE); //Peter Panning
+	glClear(GL_DEPTH_BUFFER_BIT);
+	//glCullFace(GL_FRONT);
 
 	for (GameObject& gameObject : gameObjects)
 	{
@@ -561,7 +599,8 @@ void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Li
 	}
 
 	glViewport(0, 0, windowWidth, windowHeight);
-	glCullFace(GL_BACK);
+	//glCullFace(GL_BACK);
+	//glDisable(GL_CULL_FACE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	//=========================================================================================================================
@@ -738,4 +777,21 @@ void CreateRenderQuad(unsigned int& VAO)
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(2 * sizeof(float)));
 	glBindVertexArray(0);
+}
+
+std::vector<glm::vec4> GetFrustumCornersWorldSpace(const glm::mat4& projectionMatrix, const glm::mat4& viewMatrix) {
+	const glm::mat4 inverse = glm::inverse(projectionMatrix * viewMatrix);
+
+	std::vector<glm::vec4> frustumCorners;
+	for (int x = 0; x < 2; x++)
+	{
+		for (int y = 0; y < 2; y++)
+		{
+			for (int z = 0; z < 2; z++)
+			{
+				const glm::vec4 point = inverse * glm::vec4(2.0f * x - 1.0f, 2.0f * y - 1.0f, 2.0f * z - 1.0f, 1.0f);
+				frustumCorners.push_back(point / point.w);
+			}
+		}
+	}
 }
