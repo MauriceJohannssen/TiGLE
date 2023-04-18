@@ -16,5 +16,4 @@ public:
 private:
 	glm::vec3 movementVector;
 	glm::mat4 projectionMatrix;
-
 };

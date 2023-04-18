@@ -1,6 +1,7 @@
 ﻿#include "Light.h"
 
-Light::Light(std::string pName, LightType pLightType, glm::vec3 pColor, const char* path, float pIntensity) : GameObject(path), lightType(pLightType), ambient(pColor), diffuse(pColor), specular(pColor), intensity(pIntensity) {
+Light::Light(std::string pName, LightType pLightType, glm::vec3 pColor, const char* path, float pIntensity) : 
+	GameObject(path), lightType(pLightType), ambient(pColor), diffuse(pColor), specular(pColor), intensity(pIntensity) {
 
 }
 
