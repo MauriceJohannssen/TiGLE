@@ -10,8 +10,12 @@ Transform::Transform() : objectSpace(glm::mat4(1)) {
 Transform::Transform(std::string& pName) : name(pName), objectSpace(glm::mat4(1)) {
 }
 
+Transform::Transform(const Transform& other) {
+	objectSpace = other.objectSpace;
+	name = other.name;
+}
+
 Transform::~Transform() {
-	ObjectCount--;
 }
 
 glm::vec3 Transform::GetPosition() const {
@@ -46,6 +50,11 @@ void Transform::Rotate(const float pAngle, const glm::vec3 pAxis) {
 	objectSpace = glm::rotate(objectSpace, pAngle, pAxis);
 }
 
+void Transform::LookAt(const glm::vec3 pos) {
+	glm::vec3 direction = glm::normalize(pos - GetPosition());
+	glm::mat4 newRot = glm::lookAt(GetPosition(), direction, glm::vec3(0,1,0));
+	objectSpace = glm::translate(glm::mat4(1.0f), GetPosition()) * newRot;
+}
 
 glm::mat4 Transform::GetObjectMatrix() const {
 	return objectSpace;

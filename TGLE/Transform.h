@@ -7,6 +7,7 @@ class Transform {
 public:
 	Transform();
 	Transform(std::string& pName);
+	Transform(const Transform& other);
 	~Transform();
 
 	glm::vec3 GetPosition() const;
@@ -23,10 +24,14 @@ public:
 
 	void Rotate(const float pAngle, const glm::vec3 pAxis);
 
+	void LookAt(const glm::vec3 pos);
+
 	glm::mat4 GetObjectMatrix() const;
 
 	std::string& GetName();
 
+
+	Transform* parent;
 private:
 	static unsigned int ObjectCount;
 	std::string name;
