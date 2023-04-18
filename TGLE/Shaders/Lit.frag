@@ -38,20 +38,36 @@ struct PointLight {
 	float intensity;
 };
 
-#define POINT_LIGHT_COUNT 3  
+#define POINT_LIGHT_COUNT 3
 uniform PointLight pointLights[POINT_LIGHT_COUNT];
+
+struct DirectionalLight{
+	vec3 direction;
+
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+
+	float intensity;
+};
+
+uniform DirectionalLight directionalLight;
 
 //Camera
 uniform vec3 cameraPosition;
 uniform float bloomThreshold;
 
-vec3 CalculateDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition, vec3 pViewDirection);
+vec3 CalculateDirectionalLight(DirectionalLight dirLight, vec3 normal, vec3 viewDirection);
+vec3 CalculatePointLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition, vec3 pViewDirection);
 float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirection);
 
 void main() {
 	vec3 finalColor = vec3(0,0,0);
+
+	finalColor += CalculateDirectionalLight(directionalLight, normalize(vNormal), cameraPosition - vFragPosition);
+
 	for(int i = 0; i < POINT_LIGHT_COUNT; i++) {
-		finalColor += CalculateDirectionalLight(pointLights[i], normalize(vNormal), vFragPosition, cameraPosition - vFragPosition);
+		//finalColor += CalculatePointLight(pointLights[i], normalize(vNormal), vFragPosition, cameraPosition - vFragPosition);
 	}
 	fragColor = vec4(finalColor,1);
 
@@ -69,8 +85,23 @@ void main() {
 	vertexPosition = vec4(vFragPosition,1);
 }
 
+vec3 CalculateDirectionalLight(DirectionalLight dirLight, vec3 normal, vec3 viewDirection) {
+	vec3 ambient = vec3(texture(material.texture_diffuse1, vUVs)) * dirLight.ambient * 0.1;
+	vec3 lightDirection = normalize(-dirLight.direction);
 
-vec3 CalculateDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition, vec3 pViewDirection) {
+	vec3 diffuse = max(dot(normal, lightDirection), 0.0) * vec3(texture(material.texture_diffuse1, vUVs)) * dirLight.diffuse;
+
+	vec3 halfwayDirection = normalize(lightDirection + viewDirection);
+	float finalSpecular = pow(max(dot(normal, halfwayDirection), 0.0), 32);
+	vec3 specular = finalSpecular * vec3(texture(material.texture_specular1, vUVs)) * dirLight.specular;
+
+	float shadowValue = CalculateShadow(vFragLightPosition, normal, lightDirection);
+
+	return (ambient + ((diffuse + specular) * (1 - shadowValue))) * dirLight.intensity;
+}
+
+
+vec3 CalculatePointLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition, vec3 pViewDirection) {
 	//Ambient
 	pViewDirection = normalize(pViewDirection);
 	//Todo: Currently the ambient value is lowered here. This should be a variable!
@@ -90,13 +121,13 @@ vec3 CalculateDirectionalLight(PointLight pointLight, vec3 pNormal, vec3 pFragPo
 	float distanceLightFrag = length(pointLight.position - vFragPosition);
 	float attenuation = 1.0 / (pointLight.constant + pointLight.linear * distanceLightFrag + pointLight.quadratic * (distanceLightFrag * distanceLightFrag));
 
-	float shadowValue = CalculateShadow(vFragLightPosition, pNormal, lightDirection);
+	float shadowValue = 0; //CalculateShadow(vFragLightPosition, pNormal, lightDirection);
 	return (ambient + ((1 - shadowValue) * (diffuse + specular))) * attenuation * pointLight.intensity;
 }
 
 float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirection){
 	vec3 coords = fragPositionLightSpace.xyz / fragPositionLightSpace.w;
-	coords = coords * 0.5 + 0.5f;
+	coords = coords * 0.5 + 0.5;
 
 	float closestDepth = texture(shadowMap, coords.xy).r;
 	float currentDepth = coords.z;
@@ -104,10 +135,10 @@ float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirect
 		return 0.0;
 	}
 
-	float bias = max(0.05 * (1.0 - dot(normal, lightDirection)), 0.003);
+	float bias = max(0.05 * (1.0 - dot(normal, lightDirection)), 0.006);
 
 	float shadow = 0.0;
-	vec2 texelSize = 0.5 / textureSize(shadowMap, 0);
+	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
 
 	//PCF
 	for(int x = -2; x <= 2; x++){
@@ -117,6 +148,6 @@ float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirect
 		}
 	}
 
-	shadow /= 25;
+	shadow /= 25; //Get the weighted average.
 	return shadow;
 }

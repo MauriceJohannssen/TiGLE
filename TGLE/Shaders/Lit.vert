@@ -16,7 +16,7 @@ uniform mat4 lightSpaceMatrix;
 void main()
 {
 	vUVs = inUVs;
-	vNormal = mat3(transpose(inverse(objectMatrix))) * inNormal;
+	vNormal = transpose(inverse(mat3(objectMatrix))) * inNormal;
 	vFragPosition = vec3(objectMatrix * vec4(inPosition,1.0));
 	vFragLightPosition = lightSpaceMatrix * vec4(vFragPosition, 1.0);
 	gl_Position = transform * vec4(inPosition, 1.0);
