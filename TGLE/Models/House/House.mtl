@@ -1,0 +1,99 @@
+# Blender 3.5.0 MTL File: 'Sketchfab_2015_08_08_02_02_12.blend.blend'
+# www.blender.org
+
+newmtl RegenrinneGelaender
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.429226 0.429226 0.429226
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd regenrinnegelaender_combined.jpeg
+map_Ks regenrinnegelaender_combined.jpeg
+
+newmtl blitzableiterRohrKabel
+Ns 40.000019
+Ka 1.000000 1.000000 1.000000
+Kd 0.098506 0.098506 0.098506
+Ks 0.234848 0.234848 0.234848
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd rohr kabel_combined.jpeg
+map_Ks rohr kabel_combined.jpeg
+
+newmtl dach
+Ns 4579.600098
+Ka 1.000000 1.000000 1.000000
+Kd 0.138432 0.135633 0.130137
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd dach_combined.jpeg
+map_Ks dach_combined.jpeg
+
+newmtl fensterglas
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.003024 0.004920 0.009019
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd fensterscheiben_combined.jpeg
+map_Ks fensterscheiben_combined.jpeg
+
+newmtl fensterrahmen
+Ns 4579.600098
+Ka 1.000000 1.000000 1.000000
+Kd 0.057265 0.074214 0.051745
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd fensterrahmen_combined.jpeg
+map_Ks fensterrahmen_combined.jpeg
+
+
+newmtl stellwerkwand
+Ns 4579.600098
+Ka 1.000000 1.000000 1.000000
+Kd 0.226587 0.202156 0.166527
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd stellwerk_combine.jpeg
+map_Ks stellwerk_combine.jpeg
+
+newmtl stromkaesten
+Ns 4579.600098
+Ka 1.000000 1.000000 1.000000
+Kd 0.570474 0.570474 0.570474
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd stromk-schild_combined.jpeg
+map_Ks stromk-schild_combined.jpeg
+
+newmtl treppe
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.496923 0.488497 0.426146
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd treppe_combined.jpeg
+map_Ks treppe_combined.jpeg
