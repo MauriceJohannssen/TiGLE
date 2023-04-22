@@ -127,7 +127,7 @@ void Render(Scene& scene, const glm::mat4& viewMatrix,
 	unsigned int& vertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex, unsigned int csmBuffer, unsigned int csmTexts, unsigned int csmUBO, const std::vector<float>& cascadedShadowLevels);
 
 
-std::vector<glm::mat4> GetLightSpaceMatrices(const float nearPlane, const float farPlane, Camera& camera, glm::vec3 lightDirection, const std::vector<float>& cascadedShadowLevels);
+std::vector<glm::mat4> GetLightSpaceMatrices(Camera& camera, glm::vec3 lightDirection, const std::vector<float>& cascadedShadowLevels);
 
 int main()
 {
@@ -149,8 +149,8 @@ int main()
 	Scene scene;
 
 	//Camera
-	scene.GetMainCamera().SetPosition(glm::vec3(5, 0, 0));
-	scene.GetMainCamera().SetForward(glm::vec3(0, 0, -1));
+	scene.GetMainCamera().SetPosition(glm::vec3(2, 1, 0.2f));
+	scene.GetMainCamera().SetForward(glm::vec3(1, 0, 0));
 
 	//Setup shadow=====================================================================================================
 	unsigned int shadowMapFBO;
@@ -288,7 +288,6 @@ int main()
 	//Lights
 	Light sun("sun", LightType::Directional, glm::vec3(1, 1, 1), "Models/Cube/Cube.obj", 2.0f);
 	sun.SetPosition(glm::vec3(-15, 15, 0));
-	//sun.LookAt(glm::vec3(-244.0f, 422.0f, -41.0f));
 	sun.SetForward(glm::normalize(glm::vec3(1, -1, 1)));
 	sun.Scale(glm::vec3(0.1f));
 	scene.GetLights().push_back(sun);
@@ -330,12 +329,14 @@ int main()
 		//Input
 		HandleInput(&window, &mainCamera, deltaTime.asSeconds());
 
-		//Camera movement
-		if (mainCamera.GetMovementVector().length() > 0.01f)
-		{
-			mainCamera.Translate(mainCamera.GetMovementVector() * 0.8f * deltaTime.asSeconds());
-			mainCamera.SetMovementVector(mainCamera.GetMovementVector() * 0.9f);
-		}
+		////Camera movement
+		//if (mainCamera.GetMovementVector().length() > 0.01f)
+		//{
+		//	mainCamera.Translate(mainCamera.GetMovementVector() * 0.8f * deltaTime.asSeconds());
+		//	mainCamera.SetMovementVector(mainCamera.GetMovementVector() * 0.9f);
+		//}
+
+		mainCamera.Translate(glm::vec3(1, 0, 0) * 0.8f * deltaTime.asSeconds());
 
 		//Update View Matrix
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
@@ -588,7 +589,7 @@ void RenderObjects(Scene& scene, Shader& shader, const glm::mat4 MVMatrix, const
 			shader.SetFloat("cascadePlaneDistances[" + std::to_string(i) + "]", cascadedShadowLevels[i]);
 		}
 
-		shader.SetMat4("view", MVMatrix);
+		shader.SetMat4("viewMatrix", MVMatrix);
 
 		//This is inefficient and just for testing purposes!
 		//Use uniform buffer objects or classes.
@@ -659,7 +660,8 @@ void Render(Scene& scene, const glm::mat4& viewMatrix,
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	//CSM==============================================================================================================
-	const auto lightMatrices = GetLightSpaceMatrices(std::get<0>(cameraPlanes), std::get<1>(cameraPlanes), scene.GetMainCamera(), scene.GetLights()[0].GetForward(), cascadedShadowLevels);
+	const auto lightMatrices = GetLightSpaceMatrices(scene.GetMainCamera(), scene.GetLights()[0].GetForward(), cascadedShadowLevels);
+
 	glBindBuffer(GL_UNIFORM_BUFFER, csmUBO);
 	for (unsigned int i = 0; i < lightMatrices.size(); ++i)
 	{
@@ -941,18 +943,18 @@ glm::mat4 GetLightMatrix(const float nearPlane, const float farPlane, Camera& ca
 	return lightProjection * lightView;
 }
 
-std::vector<glm::mat4> GetLightSpaceMatrices(const float nearPlane, const float farPlane, Camera& camera, glm::vec3 lightDirection, const std::vector<float>& cascadedShadowLevels) {
+std::vector<glm::mat4> GetLightSpaceMatrices(Camera& camera, glm::vec3 lightDirection, const std::vector<float>& cascadedShadowLevels) {
 	std::vector<glm::mat4> matrices;
 
 	for (unsigned int shadowLvl = 0; shadowLvl < cascadedShadowLevels.size() + 1; ++shadowLvl) {
 		if (shadowLvl == 0) {
-			matrices.push_back(GetLightMatrix(nearPlane, cascadedShadowLevels[shadowLvl], camera, lightDirection));
+			matrices.push_back(GetLightMatrix(std::get<0>(camera.GetNearFarPlanes()), cascadedShadowLevels[shadowLvl], camera, lightDirection));
 		}
 		else if (shadowLvl < cascadedShadowLevels.size()) {
 			matrices.push_back(GetLightMatrix(cascadedShadowLevels[shadowLvl - 1], cascadedShadowLevels[shadowLvl], camera, lightDirection));
 		}
 		else {
-			matrices.push_back(GetLightMatrix(cascadedShadowLevels[shadowLvl - 1], farPlane, camera, lightDirection));
+			matrices.push_back(GetLightMatrix(cascadedShadowLevels[shadowLvl - 1], std::get<1>(camera.GetNearFarPlanes()), camera, lightDirection));
 		}
 	}
 
