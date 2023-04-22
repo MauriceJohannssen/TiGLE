@@ -18,10 +18,14 @@
 #include "imgui-SFML.h"
 #include <ctime>
 #include <cstdlib>
+#include "Scene.h"
 
 //Global window settings
 constexpr int windowWidth = 1600;
 constexpr int windowHeight = 900;
+
+const unsigned int ShadowWidth = 8192;
+const unsigned int ShadowHeight = 8192;
 
 //GUI state variables
 struct GUIStateVariables {
@@ -49,9 +53,9 @@ struct Bloom {
 
 struct DepthOfField {
 	DepthOfField() : IsEnabled(false), Aperture(0.5f), ImageDistance(1.0f), PlaneInFocus(1.0f), Near(1.0f), Far(1.0f) {}
-	DepthOfField(float aperture, float imageDistance, float planeInFocus, float near, float far, bool enabled = false) 
+	DepthOfField(float aperture, float imageDistance, float planeInFocus, float near, float far, bool enabled = false)
 		: IsEnabled(enabled), Aperture(aperture), ImageDistance(imageDistance),
-	PlaneInFocus(planeInFocus), Near(near), Far(far) {}
+		PlaneInFocus(planeInFocus), Near(near), Far(far) {}
 
 	bool IsEnabled;
 	float Aperture;
@@ -80,7 +84,7 @@ class PostProcessingEffects
 {
 public:
 	PostProcessingEffects(Bloom bloom, DepthOfField dof) : Bloom(bloom), DepthOfField(dof) {
-		
+
 	}
 
 	Bloom& GetBloom() {
@@ -118,9 +122,12 @@ void CreateRenderQuad(unsigned int& VAO);
 void LightGui(Light& light);
 void RenderDof(std::map<std::string, Shader>& shaders, Camera& camera, unsigned int sharpColorBuffer, unsigned int blurredColorBuffer, unsigned int vertexPositionTex);
 
-void Render(Camera& pCamera, std::vector<GameObject>& pGameObjects, std::vector<Light>& pLights, const glm::mat4& pViewMatrix, const glm::mat4& pProjectionMatrix,
-	std::map<std::string, Shader> pShaders, unsigned int pQuadVAO, unsigned int pHdrFramebuffer, unsigned int pHdrColorbuffers[], unsigned int pBloomFramebuffer[], unsigned int pBloomColorbuffers[],
-	unsigned int& pVertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex);
+void Render(Scene& scene, const glm::mat4& viewMatrix,
+	std::map<std::string, Shader> shaders, unsigned int quadVAO, unsigned int HDRFramebuffer, unsigned int HDRColorbuffers[], unsigned int bloomFramebuffers[], unsigned int bloomColorbuffers[],
+	unsigned int& vertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex, unsigned int csmBuffer, unsigned int csmTexts, unsigned int csmUBO, const std::vector<float>& cascadedShadowLevels);
+
+
+std::vector<glm::mat4> GetLightSpaceMatrices(const float nearPlane, const float farPlane, Camera& camera, glm::vec3 lightDirection, const std::vector<float>& cascadedShadowLevels);
 
 int main()
 {
@@ -138,22 +145,27 @@ int main()
 	PrintDebugInformation();
 
 	srand(time(nullptr));
-	
-	//Setup shadow=======================================================================================================
+
+	Scene scene;
+
+	//Camera
+	scene.GetMainCamera().SetPosition(glm::vec3(5, 0, 0));
+	scene.GetMainCamera().SetForward(glm::vec3(0, 0, -1));
+
+	//Setup shadow=====================================================================================================
 	unsigned int shadowMapFBO;
 	glGenFramebuffers(1, &shadowMapFBO);
-
-	const unsigned int ShadowWidth = 8192;
-	const unsigned int ShadowHeight = 8192;
 
 	unsigned int depthMap;
 	glGenTextures(1, &depthMap);
 	glBindTexture(GL_TEXTURE_2D, depthMap);
+
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, ShadowWidth, ShadowHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
 	float borderColor[] = { 1.f, 1.f, 1.f, 1.f };
 	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
@@ -163,7 +175,43 @@ int main()
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	//===================================================================================================================
+	//Setup CSM========================================================================================================
+
+	float cameraFarPlane = std::get<1>(scene.GetMainCamera().GetNearFarPlanes());
+	std::vector<float> shadowCascadeLevels{ cameraFarPlane / 50.0f, cameraFarPlane / 25.0f, cameraFarPlane / 10.0f, cameraFarPlane / 2.0f };
+
+	unsigned int CSM_FBO;
+	glGenFramebuffers(1, &CSM_FBO);
+
+	unsigned int CSM_DepthMaps;
+	glGenTextures(1, &CSM_DepthMaps);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, CSM_DepthMaps);
+	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F, ShadowWidth, ShadowHeight,
+		int(shadowCascadeLevels.size()) + 1, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	constexpr float bordercolor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, bordercolor);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, CSM_FBO);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, CSM_DepthMaps, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	unsigned int matricesUBO;
+	glGenBuffers(1, &matricesUBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, matricesUBO);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4x4) * 16, nullptr, GL_STATIC_DRAW);
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, matricesUBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+	//=================================================================================================================
 	//Setup buffers
 	unsigned int hdrFramebuffer;
 	unsigned int hdrColorbuffers[2];
@@ -179,12 +227,14 @@ int main()
 	unsigned int quadVAO;
 	CreateRenderQuad(quadVAO);
 
-	//Setup shaders
+	//Shaders
 	std::map<std::string, Shader> shaders;
 	shaders["ColorShader"] = Shader("Shaders/Lit.vert", "Shaders/Lit.frag");
 	shaders["LightsShader"] = Shader("Shaders/Lit.vert", "Shaders/LightSource.frag");
 
+	//Shadowmapping
 	shaders["DepthShader"] = Shader("Shaders/DepthShader.vert", "Shaders/DepthShader.frag");
+	shaders["CSMDepthShader"] = Shader("Shaders/CSM_DepthShader.vert", "Shaders/CSM_DepthShader.frag", "Shaders/CSM_DepthShader.geom");
 
 	Shader textureShader("Shaders/Texture.vert", "Shaders/Texture.frag");
 	textureShader.Use();
@@ -207,24 +257,16 @@ int main()
 	DoFShader.SetInt("vertexPositions", 2);
 	shaders["DofShader"] = DoFShader;
 
-	std::vector<GameObject> gameObjects;
-	std::vector<Light> lightSources;
-
 	//GameObjects
 	GameObject gameObject1("Models/R99/R99.obj");
 	gameObject1.SetPosition(glm::vec3(1.5f, -0.5f, 0));
 	gameObject1.Scale(glm::vec3(2));
-	gameObjects.push_back(gameObject1);
-
-	GameObject gameObject2("Models/R99/R99.obj");
-	gameObject2.SetPosition(glm::vec3(-1.0f, -0.45f, -0.5));
-	gameObject2.Scale(glm::vec3(2));
-	gameObjects.push_back(gameObject2);
+	scene.GetGameObjects().push_back(gameObject1);
 
 	GameObject ground("Models/Cube/Cube.obj");
 	ground.Scale(glm::vec3(50, 0.01f, 12));
 	ground.SetPosition(glm::vec3(40, -1.0f, 0));
-	gameObjects.push_back(ground);
+	scene.GetGameObjects().push_back(ground);
 
 	float z = 7.0f;
 	for (unsigned row = 0; row < 2; ++row) {
@@ -232,9 +274,12 @@ int main()
 			GameObject house("Models/House/House.obj");
 			house.SetPosition(glm::vec3(8.0f * i, -1.0f, z));
 			float randRot = row * 110.0f + rand() % 5;
-			std::cout << randRot << std::endl;
 			house.Rotate(randRot, glm::vec3(0, 1, 0));
-			gameObjects.push_back(house);
+			scene.GetGameObjects().push_back(house);
+
+			GameObject lamp("Models/Lamp/Lamp.obj");
+			lamp.SetPosition(glm::vec3(5 * i, -1.0, 0));
+			scene.GetGameObjects().push_back(lamp);
 		}
 
 		z *= -1;
@@ -242,44 +287,45 @@ int main()
 
 	//Lights
 	Light sun("sun", LightType::Directional, glm::vec3(1, 1, 1), "Models/Cube/Cube.obj", 2.0f);
-	sun.SetPosition(glm::vec3(-15,10,20));
-	sun.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+	sun.SetPosition(glm::vec3(-15, 15, 0));
+	//sun.LookAt(glm::vec3(-244.0f, 422.0f, -41.0f));
+	sun.SetForward(glm::normalize(glm::vec3(1, -1, 1)));
 	sun.Scale(glm::vec3(0.1f));
-	lightSources.push_back(sun);
+	scene.GetLights().push_back(sun);
 
 	Light light("light_1", LightType::Point, glm::vec3(0.1f, 0.05f, 1), "Models/Cube/Cube.obj", 30);
 	light.SetPosition(glm::vec3(50.0f, 8.0f, 0.0f));
 	light.Scale(glm::vec3(0.05f));
-	lightSources.push_back(light);
+	scene.GetLights().push_back(light);
 
 	Light light2("light_2", LightType::Point, glm::vec3(1, 0, 1), "Models/Cube/Cube.obj", 25);
 	light2.SetPosition(glm::vec3(25.0f, 4.0f, 0.0f));
 	light2.Scale(glm::vec3(0.05f));
-	lightSources.push_back(light2);
+	scene.GetLights().push_back(light2);
 
 	Light light3("light_3", LightType::Point, glm::vec3(0.7f, 0.2f, 0.7f), "Models/Cube/Cube.obj", 10);
 	light3.SetPosition(glm::vec3(0.0f, 2.0f, 0.0f));
 	light3.Scale(glm::vec3(0.05f));
-	lightSources.push_back(light3);
+	scene.GetLights().push_back(light3);
 
 	//Time
 	sf::Clock clock;
 	sf::Time deltaTime;
 	sf::Time lastFrame;
 
-	//Camera
-	Camera mainCamera(ProjectionType::Perspective);
-	mainCamera.SetPosition(glm::vec3(0, 0, 3));
-	mainCamera.SetForward(glm::vec3(0, 0, -1));
-
 	PostProcessingEffects postProcessingEffects(Bloom(2.0f, 20), DepthOfField(1.0f, 1.0f, 1.5f, 0.1f, 2.0f));
 
-	//Main Engine Loop=========================================================================================================
+	std::cout << "OpenGL version: " << glGetString(GL_VERSION) << std::endl;
+	std::cout << "OpenGL vendor: " << glGetString(GL_VENDOR) << std::endl;
+
+	//Main Engine Loop=================================================================================================
 	while (window.isOpen())
 	{
 		//Update Time
 		deltaTime = clock.getElapsedTime() - lastFrame;
 		lastFrame = clock.getElapsedTime();
+
+		Camera& mainCamera = scene.GetMainCamera();
 
 		//Input
 		HandleInput(&window, &mainCamera, deltaTime.asSeconds());
@@ -291,19 +337,17 @@ int main()
 			mainCamera.SetMovementVector(mainCamera.GetMovementVector() * 0.9f);
 		}
 
-		gameObjects.at(0).Rotate(-1 * deltaTime.asSeconds(), glm::vec3(0, 1, 0));
-
 		//Update View Matrix
 		glm::mat4 view = glm::lookAt(mainCamera.GetPosition(), mainCamera.GetPosition() + mainCamera.GetForward(), mainCamera.GetUp());
 
 		//Render
-		Render(mainCamera, gameObjects, lightSources, view, mainCamera.GetProjectionMatrix(), shaders, quadVAO,
-			hdrFramebuffer, hdrColorbuffers, bloomFramebuffers, bloomColorbuffers, vertexPosition, postProcessingEffects, shadowMapFBO, depthMap);
+		Render(scene, view, shaders, quadVAO, hdrFramebuffer, hdrColorbuffers, bloomFramebuffers,
+			bloomColorbuffers, vertexPosition, postProcessingEffects, shadowMapFBO, depthMap, CSM_FBO, CSM_DepthMaps, matricesUBO, shadowCascadeLevels);
 
 		//Save GL states before ImGui draw
 		window.pushGLStates();
 
-		//GUI=====================================================================================================================
+		//GUI==========================================================================================================
 		ImGui::SFML::Update(window, deltaTime);
 
 		//Menu bar
@@ -344,18 +388,19 @@ int main()
 		ImGui::EndMainMenuBar();
 
 		ImGui::Begin("Scene Hierarchy");
-		for(GameObject& gameObject : gameObjects)
+		for (GameObject& gameObject : scene.GetGameObjects())
 		{
 			ImGui::Text("%s", gameObject.GetName().c_str());
 		}
 
-		for(Light& light : lightSources)
+		for (Light& light : scene.GetLights())
 		{
 			ImGui::Text("%s", light.GetName().c_str());
 		}
 		ImGui::End();
 
 		//Light Settings
+		auto& lightSources = scene.GetLights();
 		if (GUIStateVariables::ShowLightingSettings) {
 			ImGui::Begin("Lighting settings", &GUIStateVariables::ShowLightingSettings);
 			if (ImGui::TreeNode("Light 1")) {
@@ -382,7 +427,7 @@ int main()
 			ImGui::SliderFloat("Image Distance", &DoF.ImageDistance, 0.0f, 20.0f);
 			ImGui::SliderFloat("Plane in Focus", &DoF.PlaneInFocus, 0.0f, 20.0f);
 			ImGui::SliderFloat("Near", &DoF.Near, 0.0f, 20.0f);
-			if(DoF.Near >= DoF.Far)
+			if (DoF.Near >= DoF.Far)
 			{
 				DoF.Far = DoF.Near + 0.01f;
 			}
@@ -491,7 +536,7 @@ void LightGui(Light& light) {
 	}
 }
 
-void RenderLights(Shader& shader, std::vector<Light> lights, 
+void RenderLights(Shader& shader, std::vector<Light> lights,
 	const glm::mat4 MVMatrix, PostProcessingEffects postProcessingEffects)
 {
 
@@ -504,25 +549,25 @@ void RenderLights(Shader& shader, std::vector<Light> lights,
 		shader.SetMat4("objectMatrix", objectMatrix);
 		shader.SetVec3("lightColor", light.GetDiffuse());
 		shader.SetFloat("intensity", light.GetIntensity());
-		
+
 		//Bloom threshold
 		shader.SetFloat("bloomThreshold", postProcessingEffects.GetBloom().Threshold);
 		light.Draw(shader);
 	}
 }
 
-void RenderObjects(Shader& shader, std::vector<GameObject> gameObjects, std::vector<Light>& lights, 
-	const glm::mat4 MVMatrix, const glm::mat4 lightSpaceMatrix, unsigned int& depthMap, Camera& camera, PostProcessingEffects postProcessingEffects)
+void RenderObjects(Scene& scene, Shader& shader, const glm::mat4 MVMatrix, const glm::mat4 lightSpaceMatrix,
+	unsigned int& depthMap, PostProcessingEffects postProcessingEffects, unsigned int& lightDepthMaps, const std::vector<float>& cascadedShadowLevels)
 {
-	for (GameObject& gameObject : gameObjects)
+	for (GameObject& gameObject : scene.GetGameObjects())
 	{
 		glm::mat4 objectMatrix = gameObject.GetObjectMatrix();
 		shader.Use();
 		const glm::mat4 MVPMatrix = MVMatrix * objectMatrix;
 		shader.SetMat4("transform", MVPMatrix);
-		shader.SetMat4("objectMatrix", objectMatrix);
+		shader.SetMat4("objectMatrix", objectMatrix); //Doubled. Bad.
 		shader.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-		shader.SetVec3("cameraPosition", camera.GetPosition());
+		shader.SetVec3("cameraPosition", scene.GetMainCamera().GetPosition());
 
 		//Bloom threshold
 		shader.SetFloat("bloomThreshold", postProcessingEffects.GetBloom().Threshold);
@@ -531,11 +576,25 @@ void RenderObjects(Shader& shader, std::vector<GameObject> gameObjects, std::vec
 		glActiveTexture(GL_TEXTURE15);
 		glBindTexture(GL_TEXTURE_2D, depthMap);
 
+		shader.SetInt("cascadedShadowMaps", 10);
+		glActiveTexture(GL_TEXTURE10);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, lightDepthMaps);
+
+
+		shader.SetFloat("farPlane", std::get<1>(scene.GetMainCamera().GetNearFarPlanes()));
+		shader.SetInt("cascadeCount", cascadedShadowLevels.size());
+		for (size_t i = 0; i < cascadedShadowLevels.size(); ++i)
+		{
+			shader.SetFloat("cascadePlaneDistances[" + std::to_string(i) + "]", cascadedShadowLevels[i]);
+		}
+
+		shader.SetMat4("view", MVMatrix);
+
 		//This is inefficient and just for testing purposes!
 		//Use uniform buffer objects or classes.
-		for (unsigned int i = 0; i < lights.size(); i++)
+		for (unsigned int i = 0; i < scene.GetLights().size(); i++)
 		{
-			Light light = lights.at(i);
+			Light light = scene.GetLights()[i];
 			std::string str = std::to_string(i - 1);
 
 			switch (light.GetLightType()) {
@@ -549,7 +608,7 @@ void RenderObjects(Shader& shader, std::vector<GameObject> gameObjects, std::vec
 				shader.SetFloat("pointLights[" + str + "].quadratic", 0.3f);
 				shader.SetFloat("pointLights[" + str + "].intensity", light.GetIntensity());
 				break;
-			
+
 
 			case LightType::Directional:
 				shader.SetVec3("directionalLight.direction", light.GetForward());
@@ -557,7 +616,7 @@ void RenderObjects(Shader& shader, std::vector<GameObject> gameObjects, std::vec
 				shader.SetVec3("directionalLight.diffuse", light.GetDiffuse());
 				shader.SetVec3("directionalLight.specular", light.GetSpecular());
 				shader.SetFloat("directionalLight.intensity", light.GetIntensity());
-			break;
+				break;
 
 			default:
 				std::cout << "Hit default case for light type." << std::endl;
@@ -569,27 +628,24 @@ void RenderObjects(Shader& shader, std::vector<GameObject> gameObjects, std::vec
 	}
 }
 
-void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Light>& lights, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix,
+void Render(Scene& scene, const glm::mat4& viewMatrix,
 	std::map<std::string, Shader> shaders, unsigned int quadVAO, unsigned int HDRFramebuffer, unsigned int HDRColorbuffers[], unsigned int bloomFramebuffers[], unsigned int bloomColorbuffers[],
-	unsigned int& vertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex)
+	unsigned int& vertexPositions, PostProcessingEffects& postProcessingEffects, unsigned int shadowBuffer, unsigned int depthTex, unsigned int csmBuffer, unsigned int csmTexts, unsigned int csmUBO, const std::vector<float>& cascadedShadowLevels)
 {
-	float near = 0.0f;
-	float far = 50.0f;
-
-	glm::mat4 lightProjection = glm::ortho(-25.f, 25.f, -25.f, 25.f, near, far);
-	glm::mat4 lightView = glm::lookAt(lights[0].GetPosition(), lights[0].GetForward(), glm::vec3(0, 1, 0));
+	//Depth Buffer=====================================================================================================
+	auto cameraPlanes = scene.GetMainCamera().GetNearFarPlanes();
+	glm::mat4 lightProjection = glm::ortho(-25.f, 25.f, -25.f, 25.f, std::get<0>(cameraPlanes), std::get<1>(cameraPlanes));
+	glm::mat4 lightView = glm::lookAt(scene.GetLights()[0].GetPosition(), glm::normalize(glm::vec3(1, -1, 0.4f)), glm::vec3(0, 1, 0));
 	glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-	
-	
-	//Depth Buffer=============================================================================================================
-	glViewport(0,0, 8192, 8192);
+
+	glViewport(0, 0, ShadowWidth, ShadowHeight);
 	glBindFramebuffer(GL_FRAMEBUFFER, shadowBuffer);
 	glEnable(GL_DEPTH_TEST);
-	//glEnable(GL_CULL_FACE); //Peter Panning
 	glClear(GL_DEPTH_BUFFER_BIT);
+	//glEnable(GL_CULL_FACE); //Peter Panning
 	//glCullFace(GL_FRONT);
 
-	for (GameObject& gameObject : gameObjects)
+	for (GameObject& gameObject : scene.GetGameObjects())
 	{
 		glm::mat4 objectMatrix = gameObject.GetObjectMatrix();
 		shaders["DepthShader"].Use();
@@ -598,12 +654,41 @@ void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Li
 		gameObject.Draw(shaders["DepthShader"]);
 	}
 
-	glViewport(0, 0, windowWidth, windowHeight);
 	//glCullFace(GL_BACK);
-	//glDisable(GL_CULL_FACE);
+	glViewport(0, 0, windowWidth, windowHeight);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	//=========================================================================================================================
+	//CSM==============================================================================================================
+	const auto lightMatrices = GetLightSpaceMatrices(std::get<0>(cameraPlanes), std::get<1>(cameraPlanes), scene.GetMainCamera(), scene.GetLights()[0].GetForward(), cascadedShadowLevels);
+	glBindBuffer(GL_UNIFORM_BUFFER, csmUBO);
+	for (unsigned int i = 0; i < lightMatrices.size(); ++i)
+	{
+		glBufferSubData(GL_UNIFORM_BUFFER, i * sizeof(glm::mat4x4), sizeof(glm::mat4x4), &lightMatrices[i]);
+	}
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+	glViewport(0, 0, ShadowWidth, ShadowHeight);
+	glBindFramebuffer(GL_FRAMEBUFFER, csmBuffer);
+	glEnable(GL_DEPTH_TEST);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_CLAMP);
+	//glEnable(GL_CULL_FACE); //Peter Panning
+	//glCullFace(GL_FRONT);
+
+	for (GameObject& gameObject : scene.GetGameObjects())
+	{
+		shaders["CSMDepthShader"].Use();
+		shaders["CSMDepthShader"].SetMat4("model", gameObject.GetObjectMatrix());
+		gameObject.Draw(shaders["CSMDepthShader"]);
+	}
+
+	//glCullFace(GL_BACK);
+	//glDisable(GL_CULL_FACE);
+	glDisable(GL_DEPTH_CLAMP);
+	glViewport(0, 0, windowWidth, windowHeight);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	//=================================================================================================================
 
 	//Bind off-screen framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, HDRFramebuffer);
@@ -611,9 +696,9 @@ void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Li
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	RenderLights(shaders["LightsShader"], lights, projectionMatrix * viewMatrix, postProcessingEffects);
-	RenderObjects(shaders["ColorShader"], gameObjects, lights, projectionMatrix * viewMatrix, 
-		lightSpaceMatrix, depthTex, camera, postProcessingEffects);
+	auto projMatrix = scene.GetMainCamera().GetProjectionMatrix();
+	RenderLights(shaders["LightsShader"], scene.GetLights(), projMatrix * viewMatrix, postProcessingEffects);
+	RenderObjects(scene, shaders["ColorShader"], projMatrix * viewMatrix, lightSpaceMatrix, depthTex, postProcessingEffects, csmTexts, cascadedShadowLevels);
 
 	//Render with swapping buffers to create bloom.
 	bool horizontal = true;
@@ -634,7 +719,7 @@ void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Li
 
 		horizontal = !horizontal;
 
-		if (firstIteration){
+		if (firstIteration) {
 			firstIteration = false;
 		}
 	}
@@ -668,23 +753,26 @@ void Render(Camera& camera, std::vector<GameObject>& gameObjects, std::vector<Li
 
 		horizontal = !horizontal;
 
-		if (firstIteration){
+		if (firstIteration) {
 			firstIteration = false;
 		}
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	if(postProcessingEffects.GetDoF().IsEnabled)
+	if (postProcessingEffects.GetDoF().IsEnabled)
 	{
 		postProcessingEffects.GetDoF().Render(shaders["DofShader"],
-			camera.GetPosition(), HDRColorbuffers[1], bloomColorbuffers[0], vertexPositions); 
+			scene.GetMainCamera().GetPosition(), HDRColorbuffers[1], bloomColorbuffers[0], vertexPositions);
 	}
 	else
 	{
 		shaders["TextureShader"].Use();
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, HDRColorbuffers[1]);
+
+		//glActiveTexture(GL_TEXTURE1);
+		//glBindTexture(GL_TEXTURE_2D_ARRAY, csmTexts);
 	}
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
@@ -711,7 +799,7 @@ void CreateHDRBuffers(unsigned int& framebuffer, unsigned int colorbuffers[], un
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, colorbuffers[i], 0);
 	}
 
-	//DOF======================================================================================================================
+	//DOF==============================================================================================================
 	glGenTextures(1, &vertexPosition);
 	glBindTexture(GL_TEXTURE_2D, vertexPosition);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, windowWidth, windowHeight, 0, GL_RGBA, GL_FLOAT, nullptr);
@@ -780,18 +868,93 @@ void CreateRenderQuad(unsigned int& VAO)
 }
 
 std::vector<glm::vec4> GetFrustumCornersWorldSpace(const glm::mat4& projectionMatrix, const glm::mat4& viewMatrix) {
-	const glm::mat4 inverse = glm::inverse(projectionMatrix * viewMatrix);
+	const auto inverse = glm::inverse(projectionMatrix * viewMatrix);
 
 	std::vector<glm::vec4> frustumCorners;
-	for (int x = 0; x < 2; x++)
-	{
-		for (int y = 0; y < 2; y++)
-		{
-			for (int z = 0; z < 2; z++)
+	for (unsigned int x = 0; x < 2; ++x) {
+		for (unsigned int y = 0; y < 2; ++y) {
+			for (unsigned int z = 0; z < 2; ++z)
 			{
 				const glm::vec4 point = inverse * glm::vec4(2.0f * x - 1.0f, 2.0f * y - 1.0f, 2.0f * z - 1.0f, 1.0f);
 				frustumCorners.push_back(point / point.w);
 			}
 		}
 	}
+
+	return frustumCorners;
+}
+
+glm::mat4 GetLightMatrix(const float nearPlane, const float farPlane, Camera& camera, glm::vec3 lightDirection)
+{
+	const auto proj = glm::perspective(glm::radians(90.0f),
+		(float)windowWidth / (float)windowHeight, nearPlane, farPlane);
+
+	const auto view = glm::lookAt(camera.GetPosition(), camera.GetPosition() + camera.GetForward(), camera.GetUp());
+
+	const auto corners = GetFrustumCornersWorldSpace(proj, view);
+
+	glm::vec3 center = glm::vec3(0, 0, 0);
+	for (const auto& corner : corners) {
+		center += glm::vec3(corner);
+	}
+
+	center /= corners.size();
+
+	const auto lightView = glm::lookAt(center - lightDirection, center, glm::vec3(0.0f, 1.0f, 0.0f));
+
+
+	float minX = std::numeric_limits<float>::max();
+	float maxX = std::numeric_limits<float>::lowest();
+	float minY = std::numeric_limits<float>::max();
+	float maxY = std::numeric_limits<float>::lowest();
+	float minZ = std::numeric_limits<float>::max();
+	float maxZ = std::numeric_limits<float>::lowest();
+
+	for (const auto& v : corners) {
+		const auto transfPoint = lightView * v;
+		minX = std::min(minX, transfPoint.x);
+		maxX = std::max(maxX, transfPoint.x);
+		minY = std::min(minY, transfPoint.y);
+		maxY = std::max(maxY, transfPoint.y);
+		minZ = std::min(minZ, transfPoint.z);
+		maxZ = std::max(maxZ, transfPoint.z);
+	}
+
+	constexpr float zAxisMultiplier = 10.0f;
+
+	if (minZ < 0) {
+		minZ *= zAxisMultiplier;
+	}
+	else {
+		minZ /= zAxisMultiplier;
+	}
+
+	if (maxZ < 0) {
+		maxZ /= zAxisMultiplier;
+	}
+	else {
+		maxZ *= zAxisMultiplier;
+	}
+
+	const glm::mat4 lightProjection = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
+
+	return lightProjection * lightView;
+}
+
+std::vector<glm::mat4> GetLightSpaceMatrices(const float nearPlane, const float farPlane, Camera& camera, glm::vec3 lightDirection, const std::vector<float>& cascadedShadowLevels) {
+	std::vector<glm::mat4> matrices;
+
+	for (unsigned int shadowLvl = 0; shadowLvl < cascadedShadowLevels.size() + 1; ++shadowLvl) {
+		if (shadowLvl == 0) {
+			matrices.push_back(GetLightMatrix(nearPlane, cascadedShadowLevels[shadowLvl], camera, lightDirection));
+		}
+		else if (shadowLvl < cascadedShadowLevels.size()) {
+			matrices.push_back(GetLightMatrix(cascadedShadowLevels[shadowLvl - 1], cascadedShadowLevels[shadowLvl], camera, lightDirection));
+		}
+		else {
+			matrices.push_back(GetLightMatrix(cascadedShadowLevels[shadowLvl - 1], farPlane, camera, lightDirection));
+		}
+	}
+
+	return matrices;
 }

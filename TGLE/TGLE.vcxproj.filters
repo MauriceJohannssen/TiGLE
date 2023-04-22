@@ -42,6 +42,9 @@
     <ClCompile Include="Mesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Scene.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Input.h">
@@ -66,6 +69,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -98,6 +104,15 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="Shaders\DepthShader.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Shaders\CSM_DepthShader.geom">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Shaders\CSM_DepthShader.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Shaders\CSM_DepthShader.vert">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
