@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec4 brightColor;
@@ -10,9 +10,25 @@ in vec3 vNormal;
 in vec3 vFragPosition;
 in vec4 vFragLightPosition;
 
+//Shadowmapping========================================================================================================
 uniform sampler2D shadowMap;
 
-//Material
+//Cascaded
+uniform sampler2DArray cascadedShadowMaps;
+
+uniform mat4 viewMatrix;
+
+uniform int cascadeCount;
+uniform float cascadePlaneDistances[16];
+
+layout (std140, binding = 0) uniform LightSpaceMatrices
+{
+    mat4 lightSpaceMatrices[16];
+};
+
+uniform float farPlane;
+
+//Data Structs=========================================================================================================
 struct Material {
 	sampler2D texture_diffuse1;
 	sampler2D texture_diffuse2;
@@ -23,7 +39,6 @@ struct Material {
 
 uniform Material material;
 
-//Lighting
 struct PointLight {
 	vec3 position;
 
@@ -53,13 +68,14 @@ struct DirectionalLight{
 
 uniform DirectionalLight directionalLight;
 
-//Camera
+//Camera===============================================================================================================
 uniform vec3 cameraPosition;
 uniform float bloomThreshold;
 
 vec3 CalculateDirectionalLight(DirectionalLight dirLight, vec3 normal, vec3 viewDirection);
 vec3 CalculatePointLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition, vec3 pViewDirection);
 float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirection);
+float CSM(vec3 fragPosWorldSpace, vec3 normal, vec3 lightDirection);
 
 void main() {
 	vec3 finalColor = vec3(0,0,0);
@@ -67,7 +83,7 @@ void main() {
 	finalColor += CalculateDirectionalLight(directionalLight, normalize(vNormal), cameraPosition - vFragPosition);
 
 	for(int i = 0; i < POINT_LIGHT_COUNT; i++) {
-		//finalColor += CalculatePointLight(pointLights[i], normalize(vNormal), vFragPosition, cameraPosition - vFragPosition);
+		finalColor += CalculatePointLight(pointLights[i], normalize(vNormal), vFragPosition, cameraPosition - vFragPosition);
 	}
 	fragColor = vec4(finalColor,1);
 
@@ -86,6 +102,8 @@ void main() {
 }
 
 vec3 CalculateDirectionalLight(DirectionalLight dirLight, vec3 normal, vec3 viewDirection) {
+	const bool useCSM = true;
+
 	vec3 ambient = vec3(texture(material.texture_diffuse1, vUVs)) * dirLight.ambient * 0.1;
 	vec3 lightDirection = normalize(-dirLight.direction);
 
@@ -95,7 +113,15 @@ vec3 CalculateDirectionalLight(DirectionalLight dirLight, vec3 normal, vec3 view
 	float finalSpecular = pow(max(dot(normal, halfwayDirection), 0.0), 32);
 	vec3 specular = finalSpecular * vec3(texture(material.texture_specular1, vUVs)) * dirLight.specular;
 
-	float shadowValue = CalculateShadow(vFragLightPosition, normal, lightDirection);
+	float shadowValue = 0.0;
+	if(useCSM)
+	{
+		shadowValue = CSM(vFragPosition, normal, lightDirection);
+	}
+	else
+	{
+		shadowValue = CalculateShadow(vFragLightPosition, normal, lightDirection);
+	}
 
 	return (ambient + ((diffuse + specular) * (1 - shadowValue))) * dirLight.intensity;
 }
@@ -121,7 +147,7 @@ vec3 CalculatePointLight(PointLight pointLight, vec3 pNormal, vec3 pFragPosition
 	float distanceLightFrag = length(pointLight.position - vFragPosition);
 	float attenuation = 1.0 / (pointLight.constant + pointLight.linear * distanceLightFrag + pointLight.quadratic * (distanceLightFrag * distanceLightFrag));
 
-	float shadowValue = 0; //CalculateShadow(vFragLightPosition, pNormal, lightDirection);
+	float shadowValue = 0; //Todo: Implement point shadows.
 	return (ambient + ((1 - shadowValue) * (diffuse + specular))) * attenuation * pointLight.intensity;
 }
 
@@ -129,7 +155,7 @@ float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirect
 	vec3 coords = fragPositionLightSpace.xyz / fragPositionLightSpace.w;
 	coords = coords * 0.5 + 0.5;
 
-	float closestDepth = texture(shadowMap, coords.xy).r;
+	//float closestDepth = 0; //texture(cascadedShadowMaps, vec3(coords.xy, 0)).r; //texture(shadowMap, coords.xy).r;
 	float currentDepth = coords.z;
 	if(currentDepth > 1.0){
 		return 0.0;
@@ -144,6 +170,58 @@ float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirect
 	for(int x = -2; x <= 2; x++){
 		for(int y = -2; y <= 2; y++){
 			float pcfDepth = texture(shadowMap, coords.xy + vec2(x,y) * texelSize).r;
+			shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+		}
+	}
+
+	shadow /= 25; //Get the weighted average.
+	return shadow;
+}
+
+float CSM(vec3 fragPosWorldSpace, vec3 normal, vec3 lightDirection) {
+	vec4 fragPosViewSpace = viewMatrix * vec4(fragPosWorldSpace, 1.0);
+	float depthValue = abs(fragPosViewSpace.z);
+
+	int layer = -1;
+	for(int i = 0; i < cascadeCount; ++i) {
+		if(depthValue < cascadePlaneDistances[i]) {
+			layer = i;
+			break;
+		}
+	}
+
+	if(layer == -1) {
+		layer = cascadeCount;
+	}
+
+	vec4 fragPosLightSpace = lightSpaceMatrices[layer] * vec4(fragPosWorldSpace, 1.0);
+
+	vec3 projectedCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
+	projectedCoords = projectedCoords * 0.5 + 0.5;
+
+	float currentDepth = projectedCoords.z;
+	if(currentDepth > 1.0){
+		return 0.0;
+	}
+
+	//Calculate bias to prevent shadow acne - analog to regular shadowmapping.
+	float bias = max(0.01 * (1.0 - dot(normal, lightDirection)), 0.007);
+
+	if(layer == cascadeCount) {
+		bias *= 1 / (farPlane * 0.5);
+	}
+	else {
+		bias *= 1 / (cascadePlaneDistances[layer] * 0.5);
+	}
+
+	float shadow = 0.0;
+	vec2 texelSize = 1.0 / vec2(textureSize(cascadedShadowMaps, 0));
+
+	//PCF
+	for(int x = -2; x <= 2; x++) {
+		for(int y = -2; y <= 2; y++) {
+			float pcfDepth = texture(cascadedShadowMaps, vec3(projectedCoords.xy + vec2(x,y) * texelSize, layer)).r;
 			shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
 		}
 	}
