@@ -1,0 +1,13 @@
+# Blender 3.5.0 MTL File: 'Scene.blend'
+# www.blender.org
+
+newmtl LampBakeV2
+Ns 206.611557
+Ka 1.000000 1.000000 1.000000
+Ks 0.486364 0.486364 0.486364
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd DiffuseLamp4Kjpg.jpeg
+map_Ks RoughnessLamp.png
