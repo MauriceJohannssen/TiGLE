@@ -161,7 +161,7 @@ float CalculateShadow(vec4 fragPositionLightSpace, vec3 normal, vec3 lightDirect
 		return 0.0;
 	}
 
-	float bias = max(0.001 * (1.0 - dot(normal, lightDirection)), 0.0005);
+	float bias = max(0.005 * (1.0 - dot(normal, lightDirection)), 0.0005);
 
 	float shadow = 0.0;
 	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
