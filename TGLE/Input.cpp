@@ -9,7 +9,7 @@ float pitch = 0.0;
 float yaw = -90.0f;
 bool firstMouseMovement = true;
 
-void HandleInput(sf::Window* window, Camera* camera, float deltaTime) {
+void HandleInput(sf::Window* window, Camera* camera, float deltaTime, bool& useCSM) {
 	sf::Event event;
 	while (window->pollEvent(event)) {
 		ImGui::SFML::ProcessEvent(event);
@@ -40,8 +40,10 @@ void HandleInput(sf::Window* window, Camera* camera, float deltaTime) {
 			case sf::Keyboard::Escape:
 				window->close();
 				break;
+			case sf::Keyboard::P:
+				useCSM = !useCSM;
+				break;
 			}
-			break;
 
 		case sf::Event::MouseMoved:
 			if (!sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle)) {

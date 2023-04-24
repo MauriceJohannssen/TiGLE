@@ -28,6 +28,8 @@ layout (std140, binding = 0) uniform LightSpaceMatrices
 
 uniform float farPlane;
 
+uniform bool useCSM;
+
 //Data Structs=========================================================================================================
 struct Material {
 	sampler2D texture_diffuse1;
@@ -102,8 +104,6 @@ void main() {
 }
 
 vec3 CalculateDirectionalLight(DirectionalLight dirLight, vec3 normal, vec3 viewDirection) {
-	const bool useCSM = true;
-
 	vec3 ambient = vec3(texture(material.texture_diffuse1, vUVs)) * dirLight.ambient * 0.1;
 	vec3 lightDirection = normalize(-dirLight.direction);
 

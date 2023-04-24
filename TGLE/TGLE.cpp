@@ -101,6 +101,8 @@ private:
 	DepthOfField DepthOfField;
 };
 
+bool UseCSM = true;
+
 //These vertices are being used for the rendering quad used for HDR & Bloom.
 float quadVertices[] = {
 	-1.0f,  1.0f,  0.0f, 1.0f,
@@ -341,7 +343,7 @@ int main()
 		Camera& mainCamera = scene.GetMainCamera();
 
 		//Input
-		HandleInput(&window, &mainCamera, deltaTime.asSeconds());
+		HandleInput(&window, &mainCamera, deltaTime.asSeconds(), UseCSM);
 
 		////Camera movement
 		//if (mainCamera.GetMovementVector().length() > 0.01f)
@@ -618,6 +620,8 @@ void RenderObjects(Scene& scene, Shader& shader, const glm::mat4 MVMatrix, const
 
 		shader.SetMat4("viewMatrix", MVMatrix);
 
+		shader.SetBool("useCSM", UseCSM);
+
 		//This is inefficient and just for testing purposes!
 		//Use uniform buffer objects or classes.
 		for (unsigned int i = 0; i < scene.GetLights().size(); i++)
@@ -663,7 +667,7 @@ void Render(Scene& scene, const glm::mat4& viewMatrix,
 	//Depth Buffer=====================================================================================================
 	auto cameraPlanes = scene.GetMainCamera().GetNearFarPlanes();
 	glm::mat4 lightProjection = glm::ortho(-50.f, 50.f, -50.f, 50.f, std::get<0>(cameraPlanes), std::get<1>(cameraPlanes));
-	glm::mat4 lightView = glm::lookAt(glm::vec3(-1.5f, 3, -3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	glm::mat4 lightView = glm::lookAt(scene.GetLights()[0].GetPosition(), scene.GetLights()[0].GetPosition() + scene.GetLights()[0].GetForward(), glm::vec3(0, 1, 0)); //glm::vec3(-1.5f, 3, -3)
 	glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 	glViewport(0, 0, ShadowWidth, ShadowHeight);
