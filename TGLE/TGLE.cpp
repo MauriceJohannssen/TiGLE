@@ -19,13 +19,14 @@
 #include <ctime>
 #include <cstdlib>
 #include "Scene.h"
+#include <chrono>
 
 //Global window settings
 constexpr int windowWidth = 1600;
 constexpr int windowHeight = 900;
 
-const unsigned int ShadowWidth = 8192;
-const unsigned int ShadowHeight = 8192;
+const unsigned int ShadowWidth = 2048;
+const unsigned int ShadowHeight = ShadowWidth;
 
 //GUI state variables
 struct GUIStateVariables {
@@ -145,6 +146,17 @@ int main()
 	PrintDebugInformation();
 
 	srand(time(nullptr));
+
+	std::ofstream file("FrametimeCSM.csv");
+
+	// Check if the file was opened successfully
+	if (!file.is_open()) {
+		std::cout << "Failed to open file!" << std::endl;
+		return 1;
+	}
+	else {
+		std::cout << "CSV file open" << std::endl;
+	}
 
 	Scene scene;
 
@@ -324,6 +336,8 @@ int main()
 		deltaTime = clock.getElapsedTime() - lastFrame;
 		lastFrame = clock.getElapsedTime();
 
+		auto startTime = std::chrono::high_resolution_clock::now();
+
 		Camera& mainCamera = scene.GetMainCamera();
 
 		//Input
@@ -472,7 +486,20 @@ int main()
 		//Swap Buffers
 		window.display();
 		window.clear();
+
+		auto endTime = std::chrono::high_resolution_clock::now();
+		auto elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
+
+		float frameTime = static_cast<float>(elapsedTime) / 1000.0f; // convert to ms
+
+		//std::cout << "Frame time: " << frameTime << "s" << std::endl;
+		//std::cout << "Frame rate: " << fps << "fps" << std::endl;
+		//static int counter = 0;
+		//float fps = 1000.0f / frameTime;
+		//file << counter++ << "," << frameTime << std::endl;
 	}
+
+	file.close();
 
 	//Free memory
 	window.close();
@@ -635,8 +662,8 @@ void Render(Scene& scene, const glm::mat4& viewMatrix,
 {
 	//Depth Buffer=====================================================================================================
 	auto cameraPlanes = scene.GetMainCamera().GetNearFarPlanes();
-	glm::mat4 lightProjection = glm::ortho(-25.f, 25.f, -25.f, 25.f, std::get<0>(cameraPlanes), std::get<1>(cameraPlanes));
-	glm::mat4 lightView = glm::lookAt(scene.GetLights()[0].GetPosition(), glm::normalize(glm::vec3(1, -1, 0.4f)), glm::vec3(0, 1, 0));
+	glm::mat4 lightProjection = glm::ortho(-50.f, 50.f, -50.f, 50.f, std::get<0>(cameraPlanes), std::get<1>(cameraPlanes));
+	glm::mat4 lightView = glm::lookAt(glm::vec3(-1.5f, 3, -3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 	glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
 	glViewport(0, 0, ShadowWidth, ShadowHeight);
